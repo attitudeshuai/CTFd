@@ -97,9 +97,16 @@
 								{{ user.name | truncate(32) }}
 							</a>
 							{% if user.bracket_id %}
-								<span class="badge badge-secondary">{{ user.bracket.name }}</span>
-							{% endif %}
-							{% if user.oauth_id %}
+							<span class="badge badge-secondary">{{ user.bracket.name }}</span>
+						{% endif %}
+						{% if login_lockouts[user.id] and login_lockouts[user.id].locked %}
+							<span class="badge badge-warning"
+								title="Account locked. Unlocks in {{ format_lockout_duration(login_lockouts[user.id].remaining) }}">locked</span>
+						{% elif login_lockouts[user.id] and login_lockouts[user.id].failures %}
+							<span class="badge badge-warning"
+								title="Consecutive failed login attempts">{{ login_lockouts[user.id].failures }} failed</span>
+						{% endif %}
+						{% if user.oauth_id %}
 								<a href="https://majorleaguecyber.org/u/{{ user.name }}">
 									<span class="badge badge-primary">Official</span>
 								</a>

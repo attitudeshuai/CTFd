@@ -108,6 +108,22 @@ class AccountSettingsForm(BaseForm):
         widget=NumberInput(min=1),
         description="Number of submissions allowed per minute for flag bruteforce protection (default: 10)",
     )
+    login_lockout_enabled = SelectField(
+        "Account Login Lockout",
+        description="Lock an account after repeated failed login attempts. Locks apply to the account itself and do not affect other users sharing the same IP address",
+        choices=[("true", "Enabled"), ("false", "Disabled")],
+        default="false",
+    )
+    login_lockout_threshold = IntegerField(
+        "Failed Login Threshold",
+        widget=NumberInput(min=0),
+        description="Number of consecutive failed login attempts before the account is locked (0 disables automatic locking; default: 5)",
+    )
+    login_lockout_duration = IntegerField(
+        "Lockout Duration (seconds)",
+        widget=NumberInput(min=0),
+        description="How long an account remains locked in seconds once the threshold is reached. The lock releases automatically and administrators can also unlock accounts manually (default: 900)",
+    )
 
     submit = SubmitField("Update")
 

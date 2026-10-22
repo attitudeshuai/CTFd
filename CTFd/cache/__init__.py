@@ -1,3 +1,4 @@
+import threading
 from functools import lru_cache, wraps
 from hashlib import md5
 from time import monotonic_ns
@@ -12,6 +13,10 @@ class CTFdCache(Cache):
     Ideally likely we should have our own isolated redis connection but that might introduce more issues
     """
 
+    # Process-wide lock that serializes read-modify-write sequences on cache
+    # backends which don't provide an atomic INCR (e.g. SimpleCache/FileSystemCache)
+    _atomic_lock = threading.RLock()
+
     def inc(self, *args, **kwargs):
         """
         Support redis INCR in flask-caching
@@ -22,6 +27,27 @@ class CTFdCache(Cache):
         if inc is not None and callable(inc):
             return inc(*args, **kwargs)
         raise NotImplementedError
+
+    def atomic_inc(self, key, timeout=None):
+        """
+        Atomically increment the integer value stored at ``key`` and return the
+        new value. A missing key is treated as zero.
+
+        Redis uses INCR/EXPIRE which are atomic server side. Other backends
+        serialize the read-modify-write with a process-wide lock so that
+        concurrent threads can't lose increments. Note that without Redis the
+        guarantee only holds within a single process.
+        """
+        if current_app.config["CACHE_TYPE"] == "redis":
+            value = int(self.inc(key))
+            if timeout:
+                self.expire(key, timeout)
+            return value
+        with self._atomic_lock:
+            current = self.get(key)
+            value = int(current or 0) + 1
+            self.set(key=key, value=value, timeout=timeout)
+            return value
 
     def expire(self, key, timeout):
         """

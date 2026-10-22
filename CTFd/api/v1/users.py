@@ -33,7 +33,13 @@ from CTFd.utils.decorators.visibility import (
 )
 from CTFd.utils.email import sendmail, user_created_notification
 from CTFd.utils.helpers.models import build_model_filters
+from CTFd.utils.logging import log
 from CTFd.utils.security.auth import update_user
+from CTFd.utils.security.lockout import (
+    get_lockout_state,
+    lock_user,
+    unlock_user,
+)
 from CTFd.utils.user import (
     get_current_user,
     get_current_user_type,
@@ -541,3 +547,77 @@ class UserEmails(Resource):
                 {"success": False, "errors": {"": [response]}},
                 400,
             )
+
+
+@users_namespace.route("/<int:user_id>/lockout")
+@users_namespace.param("user_id", "User ID")
+class UserLockout(Resource):
+    @admins_only
+    @users_namespace.doc(
+        description="Endpoint to get the login lockout state for a specific User",
+        responses={200: ("Success", "APISimpleSuccessResponse")},
+    )
+    def get(self, user_id):
+        Users.query.filter_by(id=user_id).first_or_404()
+        return {"success": True, "data": get_lockout_state(user_id)}
+
+    @admins_only
+    @users_namespace.doc(
+        description="Endpoint to manually lock a specific User out of logging in",
+        responses={
+            200: ("Success", "APISimpleSuccessResponse"),
+            400: (
+                "An error occured processing the provided or stored data",
+                "APISimpleErrorResponse",
+            ),
+        },
+    )
+    def post(self, user_id):
+        Users.query.filter_by(id=user_id).first_or_404()
+
+        req = request.get_json(silent=True) or {}
+        duration = req.get("duration")
+        if duration is not None:
+            try:
+                duration = int(duration)
+            except (TypeError, ValueError):
+                return (
+                    {
+                        "success": False,
+                        "errors": {"duration": "Duration must be a positive integer"},
+                    },
+                    400,
+                )
+            if duration <= 0:
+                return (
+                    {
+                        "success": False,
+                        "errors": {"duration": "Duration must be a positive integer"},
+                    },
+                    400,
+                )
+
+        state = lock_user(user_id, duration=duration)
+        log(
+            "logins",
+            "[{date}] {ip} - admin {admin_id} manually locked user {user_id}",
+            user_id=user_id,
+            admin_id=session.get("id"),
+        )
+        return {"success": True, "data": state}
+
+    @admins_only
+    @users_namespace.doc(
+        description="Endpoint to manually unlock a specific User",
+        responses={200: ("Success", "APISimpleSuccessResponse")},
+    )
+    def delete(self, user_id):
+        Users.query.filter_by(id=user_id).first_or_404()
+        state = unlock_user(user_id)
+        log(
+            "logins",
+            "[{date}] {ip} - admin {admin_id} manually unlocked user {user_id}",
+            user_id=user_id,
+            admin_id=session.get("id"),
+        )
+        return {"success": True, "data": state}

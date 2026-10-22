@@ -18,4 +18,9 @@ DEFAULTS = {
     "registration_visibility": RegistrationVisibilityTypes.PUBLIC,
     "score_visibility": ScoreVisibilityTypes.PUBLIC,
     "account_visibility": AccountVisibilityTypes.PUBLIC,
+    # Account level login lockout. Disabled by default to preserve the
+    # historical login behavior unless an administrator opts in.
+    "login_lockout_enabled": False,
+    "login_lockout_threshold": 5,
+    "login_lockout_duration": 900,
 }

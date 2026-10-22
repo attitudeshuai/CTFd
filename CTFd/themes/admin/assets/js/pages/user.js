@@ -143,6 +143,58 @@ function deleteUser(event) {
   });
 }
 
+function lockUser(event) {
+  event.preventDefault();
+  ezQuery({
+    title: "Lock User",
+    body: "Are you sure you want to lock {0}? They will be unable to log in until the lock expires or an administrator unlocks them.".format(
+      "<strong>" + htmlEntities(window.USER_NAME) + "</strong>",
+    ),
+    success: function () {
+      CTFd.fetch("/api/v1/users/" + window.USER_ID + "/lockout", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (response) {
+          if (response.success) {
+            window.location.reload();
+          }
+        });
+    },
+  });
+}
+
+function unlockUser(event) {
+  event.preventDefault();
+  ezQuery({
+    title: "Unlock User",
+    body: "Are you sure you want to unlock {0}? Their failed login count will be cleared.".format(
+      "<strong>" + htmlEntities(window.USER_NAME) + "</strong>",
+    ),
+    success: function () {
+      CTFd.fetch("/api/v1/users/" + window.USER_ID + "/lockout", {
+        method: "DELETE",
+      })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (response) {
+          if (response.success) {
+            window.location.reload();
+          }
+        });
+    },
+  });
+}
+
 function awardUser(event) {
   event.preventDefault();
   const params = $("#user-award-form").serializeJSON(true);
@@ -458,6 +510,9 @@ const updateGraphs = (type, id, name, account_id) => {
 
 $(() => {
   $(".delete-user").click(deleteUser);
+
+  $(".lock-user").click(lockUser);
+  $(".unlock-user").click(unlockUser);
 
   $(".edit-user").click(function (_event) {
     $("#user-info-modal").modal("toggle");

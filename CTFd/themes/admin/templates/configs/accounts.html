@@ -3,7 +3,8 @@
 	{% set verify_emails = "true" if verify_emails == True else "false" %}
 	{% set name_changes = "true" if name_changes == True else "false" %}
 	{% set team_creation = "false" if team_creation == False else "true" %}
-	{% with form = Forms.config.AccountSettingsForm(verify_emails=verify_emails, name_changes=name_changes, team_disbanding=team_disbanding, team_creation=team_creation) %}
+	{% set login_lockout_enabled = "true" if login_lockout_enabled == True else "false" %}
+	{% with form = Forms.config.AccountSettingsForm(verify_emails=verify_emails, name_changes=name_changes, team_disbanding=team_disbanding, team_creation=team_creation, login_lockout_enabled=login_lockout_enabled) %}
 	<form method="POST" autocomplete="off" class="w-100">
 		<ul class="nav nav-tabs mb-3">
 			<li class="nav-item">
@@ -62,15 +63,39 @@
 					</div>
 			
 					<div class="form-group">
-						{{ form.incorrect_submissions_per_min.label }}
-						{{ form.incorrect_submissions_per_min(class="form-control", value=incorrect_submissions_per_min) }}
-						<small class="form-text text-muted">
-							{{ form.incorrect_submissions_per_min.description }}
-						</small>
-					</div>
-			
-					<div class="form-group">
-						{{ form.name_changes.label }}
+					{{ form.incorrect_submissions_per_min.label }}
+					{{ form.incorrect_submissions_per_min(class="form-control", value=incorrect_submissions_per_min) }}
+					<small class="form-text text-muted">
+						{{ form.incorrect_submissions_per_min.description }}
+					</small>
+				</div>
+
+				<div class="form-group">
+					{{ form.login_lockout_enabled.label }}
+					{{ form.login_lockout_enabled(class="form-control custom-select") }}
+					<small class="form-text text-muted">
+						{{ form.login_lockout_enabled.description }}
+					</small>
+				</div>
+
+				<div class="form-group">
+					{{ form.login_lockout_threshold.label }}
+					{{ form.login_lockout_threshold(class="form-control", value=login_lockout_threshold) }}
+					<small class="form-text text-muted">
+						{{ form.login_lockout_threshold.description }}
+					</small>
+				</div>
+
+				<div class="form-group">
+					{{ form.login_lockout_duration.label }}
+					{{ form.login_lockout_duration(class="form-control", value=login_lockout_duration) }}
+					<small class="form-text text-muted">
+						{{ form.login_lockout_duration.description }}
+					</small>
+				</div>
+
+				<div class="form-group">
+					{{ form.name_changes.label }}
 						{{ form.name_changes(class="form-control custom-select") }}
 						<small class="form-text text-muted">
 							{{ form.name_changes.description }}

@@ -100,7 +100,39 @@
 			{% if user.banned %}
 				<span class="badge badge-danger">banned</span>
 			{% endif %}
+			{% if login_lockout.locked %}
+				<span class="badge badge-warning" id="login-lockout-badge"
+					data-remaining="{{ login_lockout.remaining }}"
+					data-locked-until="{{ login_lockout.locked_until or '' }}"
+					title="Unlocks in {{ format_lockout_duration(login_lockout.remaining) }}">
+					locked
+				</span>
+			{% elif login_lockout.failures %}
+				<span class="badge badge-warning" id="login-failures-badge"
+					title="Consecutive failed login attempts">
+					{{ login_lockout.failures }} failed login{{ "s" if login_lockout.failures != 1 else "" }}
+				</span>
+			{% endif %}
 		</div>
+		{% if login_lockout.failures or login_lockout.locked %}
+			<div class="mb-2 text-muted" id="login-lockout-info"
+				data-locked="{{ "true" if login_lockout.locked else "false" }}">
+				<small>
+					{% if login_lockout.locked %}
+						Account is locked. Time remaining:
+						<strong id="login-lockout-remaining">
+							{{ format_lockout_duration(login_lockout.remaining) }}
+						</strong>
+					{% else %}
+						Consecutive failed logins: <strong>{{ login_lockout.failures }}</strong>
+					{% endif %}
+					{% if login_lockout.last_failure_iso %}
+						&middot; Last failed attempt:
+						<span data-time="{{ login_lockout.last_failure_iso }}"></span>
+					{% endif %}
+				</small>
+			</div>
+		{% endif %}
 
 			{% if user.affiliation %}
 				<h3 class="d-inline-block">
@@ -172,6 +204,15 @@
 			<a class="email-user text-dark">
 				<i class="btn-fa fas fa-envelope fa-2x px-2" data-toggle="tooltip" data-placement="top" title="Email User"></i>
 			</a>
+			{% if login_lockout.locked %}
+				<a class="unlock-user text-dark" href="javascript:void(0)">
+					<i class="btn-fa fas fa-lock-open fa-2x px-2" data-toggle="tooltip" data-placement="top" title="Unlock User"></i>
+				</a>
+			{% else %}
+				<a class="lock-user text-dark" href="javascript:void(0)">
+					<i class="btn-fa fas fa-lock fa-2x px-2" data-toggle="tooltip" data-placement="top" title="Lock User"></i>
+				</a>
+			{% endif %}
 			<a class="delete-user text-dark">
 				<i class="btn-fa fas fa-trash-alt fa-2x px-2" data-toggle="tooltip" data-placement="top" title="Delete User"></i>
 			</a>

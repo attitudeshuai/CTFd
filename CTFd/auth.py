@@ -27,6 +27,12 @@ from CTFd.utils.security.email import (
     verify_email_confirm_token,
     verify_reset_password_token,
 )
+from CTFd.utils.security.lockout import (
+    clear_login_failures,
+    get_lockout_state,
+    locked_out_message,
+    record_login_failure,
+)
 from CTFd.utils.validators import ValidationError
 
 auth = Blueprint("auth", __name__)
@@ -479,7 +485,23 @@ def login():
                 )
                 return render_template("login.html", errors=errors)
 
+            # An active account lock blocks every login attempt, even when the
+            # submitted password is correct. The lock releases on its own once
+            # it expires or can be cleared by an administrator.
+            lockout = get_lockout_state(user.id)
+            if lockout["locked"]:
+                log(
+                    "logins",
+                    "[{date}] {ip} - blocked login attempt for locked account {name}",
+                    name=user.name,
+                )
+                errors.append(locked_out_message(lockout["remaining"]))
+                db.session.close()
+                return render_template("login.html", errors=errors)
+
             if user and verify_password(request.form["password"], user.password):
+                # A successful login clears the consecutive failure streak
+                clear_login_failures(user.id)
                 session.regenerate()
 
                 login_user(user)
@@ -499,7 +521,16 @@ def login():
                     "[{date}] {ip} - submitted invalid password for {name}",
                     name=user.name,
                 )
-                errors.append("Your username or password is incorrect")
+                lockout = record_login_failure(user.id)
+                if lockout["locked"]:
+                    log(
+                        "logins",
+                        "[{date}] {ip} - {name} locked out due to failed logins",
+                        name=user.name,
+                    )
+                    errors.append(locked_out_message(lockout["remaining"]))
+                else:
+                    errors.append("Your username or password is incorrect")
                 db.session.close()
                 return render_template("login.html", errors=errors)
         else:

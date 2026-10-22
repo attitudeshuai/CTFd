@@ -4,8 +4,10 @@ from sqlalchemy.sql import not_
 from CTFd.admin import admin
 from CTFd.models import Challenges, Tracking, Users
 from CTFd.utils import get_config
+from CTFd.utils.dates import isoformat, unix_time_to_utc
 from CTFd.utils.decorators import admins_only
 from CTFd.utils.modes import TEAMS_MODE
+from CTFd.utils.security.lockout import format_lockout_duration, get_lockout_state
 
 
 @admin.route("/admin/users")
@@ -39,6 +41,8 @@ def users_listing():
     args = dict(request.args)
     args.pop("page", 1)
 
+    login_lockouts = {user.id: get_lockout_state(user.id) for user in users.items}
+
     return render_template(
         "admin/users/users.html",
         users=users,
@@ -46,6 +50,8 @@ def users_listing():
         next_page=url_for(request.endpoint, page=users.next_num, **args),
         q=q,
         field=field,
+        login_lockouts=login_lockouts,
+        format_lockout_duration=format_lockout_duration,
     )
 
 
@@ -96,6 +102,12 @@ def users_detail(user_id):
         score = None
         place = None
 
+    login_lockout = get_lockout_state(user.id)
+    if login_lockout["last_failure"]:
+        login_lockout["last_failure_iso"] = isoformat(
+            unix_time_to_utc(login_lockout["last_failure"])
+        )
+
     return render_template(
         "admin/users/user.html",
         solves=solves,
@@ -106,4 +118,6 @@ def users_detail(user_id):
         place=place,
         fails=fails,
         awards=awards,
+        login_lockout=login_lockout,
+        format_lockout_duration=format_lockout_duration,
     )
