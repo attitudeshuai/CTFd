@@ -1,10 +1,12 @@
-from flask import render_template, request, url_for
+from flask import flash, redirect, render_template, request, url_for
 from sqlalchemy.sql import not_
 
 from CTFd.admin import admin
-from CTFd.models import Challenges, Tracking, Users
+from CTFd.cache import clear_user_session
+from CTFd.models import Challenges, Tracking, UserRecoveryCodes, Users, db
 from CTFd.utils import get_config
 from CTFd.utils.decorators import admins_only
+from CTFd.utils.logging import log
 from CTFd.utils.modes import TEAMS_MODE
 
 
@@ -107,3 +109,28 @@ def users_detail(user_id):
         fails=fails,
         awards=awards,
     )
+
+
+@admin.route("/admin/users/<int:user_id>/two_factor/reset", methods=["POST"])
+@admins_only
+def users_reset_two_factor(user_id):
+    user = Users.query.filter_by(id=user_id).first_or_404()
+
+    user.totp_secret = None
+    recovery_codes = UserRecoveryCodes.query.filter_by(user_id=user.id).all()
+    for recovery_code in recovery_codes:
+        db.session.delete(recovery_code)
+    db.session.commit()
+    clear_user_session(user_id=user.id)
+
+    log(
+        "logins",
+        "[{date}] {ip} - two factor authentication reset for {name}",
+        name=user.name,
+    )
+    flash(
+        f"Two factor authentication has been reset for {user.name}. "
+        "They will need to enable it again after logging in.",
+        "success",
+    )
+    return redirect(url_for("admin.users_detail", user_id=user.id))

@@ -422,6 +422,7 @@ class Users(db.Model):
     verified = db.Column(db.Boolean, default=False)
     language = db.Column(db.String(32), nullable=True, default=None)
     change_password = db.Column(db.Boolean, default=False)
+    totp_secret = db.Column(db.String(64), nullable=True, default=None)
 
     # Relationship for Teams
     team_id = db.Column(db.Integer, db.ForeignKey("teams.id"))
@@ -523,6 +524,17 @@ class Users(db.Model):
             and self.bracket_id is not None
         )
         return required_user_fields.issubset(submitted_user_fields) and missing_bracket
+
+    @property
+    def two_factor_enabled(self):
+        return bool(self.totp_secret)
+
+    @property
+    def can_enable_two_factor(self):
+        # Only accounts with a password can use TOTP based two factor auth.
+        # Accounts created exclusively through an OAuth provider have no
+        # password and are exempt from two factor requirements.
+        return self.password is not None
 
     def get_fields(self, admin=False):
         if admin:
@@ -1069,6 +1081,25 @@ class Tokens(db.Model):
 
 class UserTokens(Tokens):
     __mapper_args__ = {"polymorphic_identity": "user"}
+
+
+class UserRecoveryCodes(db.Model):
+    __tablename__ = "user_recovery_codes"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE")
+    )
+    code_hash = db.Column(db.String(128))
+    used = db.Column(db.Boolean, default=False)
+    created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    user = db.relationship("Users", foreign_keys=[user_id], lazy="select")
+
+    def __init__(self, *args, **kwargs):
+        super(UserRecoveryCodes, self).__init__(**kwargs)
+
+    def __repr__(self):
+        return "<UserRecoveryCode %r>" % self.id
 
 
 class Comments(db.Model):

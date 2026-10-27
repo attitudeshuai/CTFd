@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="jumbotron">
+    <div class="container">
+      <h1>
+        {% trans %}Two Factor Authentication{% endtrans %}
+      </h1>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col offset-md-2 col-lg-8 offset-lg-2">
+        <div class="alert alert-warning" role="alert">
+          <strong>{% trans %}Save your recovery codes now{% endtrans %}</strong><br>
+          {% trans %}Each recovery code can be used exactly once if you lose access to your authenticator app. These codes will not be shown again.{% endtrans %}
+        </div>
+
+        <table class="table table-striped align-middle">
+          <tbody>
+            {% for code in recovery_codes %}
+              <tr>
+                <td class="font-monospace fs-5">{{ code }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <a class="btn btn-primary px-4" href="{{ url_for('views.settings') }}">
+          {% trans %}I have saved my recovery codes{% endtrans %}
+        </a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

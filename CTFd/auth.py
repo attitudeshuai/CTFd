@@ -1,3 +1,5 @@
+import secrets
+
 import requests
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 from flask import current_app as app
@@ -21,15 +23,33 @@ from CTFd.utils.helpers import error_for, get_errors, markup
 from CTFd.utils.logging import log
 from CTFd.utils.modes import TEAMS_MODE
 from CTFd.utils.security.auth import generate_preset_admin, login_user, logout_user
+from CTFd.utils.security.csrf import generate_nonce
 from CTFd.utils.security.email import (
     remove_email_confirm_token,
     remove_reset_password_token,
     verify_email_confirm_token,
     verify_reset_password_token,
 )
+from CTFd.utils.security.twofactor import (
+    LOGIN_ATTEMPT_LIMIT,
+    clear_failed_second_factor,
+    consume_recovery_code,
+    register_failed_second_factor,
+    two_factor_required_for_user,
+    verify_and_consume_totp,
+)
 from CTFd.utils.validators import ValidationError
 
 auth = Blueprint("auth", __name__)
+
+
+def establish_user_session(user):
+    """
+    Create a fully authenticated session for a user and record whether two
+    factor authentication was required for them at login time.
+    """
+    login_user(user)
+    session["two_factor_enforced"] = two_factor_required_for_user(user)
 
 
 @auth.route("/confirm", methods=["POST", "GET"])
@@ -457,7 +477,7 @@ def login():
             ) and password == preset_admin_password:
                 admin = generate_preset_admin()
                 if admin:
-                    login_user(user=admin)
+                    establish_user_session(user=admin)
                     return redirect(url_for("challenges.listing"))
                 else:
                     errors.append(
@@ -482,7 +502,25 @@ def login():
             if user and verify_password(request.form["password"], user.password):
                 session.regenerate()
 
-                login_user(user)
+                if user.totp_secret:
+                    # The password is valid but a second factor is required.
+                    # Do not establish an authenticated session yet; stash a
+                    # pending state for /login/two_factor instead. The CSRF
+                    # nonce is carried over so the pending form can post back
+                    # with the nonce served on the login page.
+                    pending_nonce = session.get("nonce") or generate_nonce()
+                    session["two_factor_user_id"] = user.id
+                    session["two_factor_attempt_key"] = secrets.token_hex(16)
+                    session["nonce"] = pending_nonce
+                    log(
+                        "logins",
+                        "[{date}] {ip} - {name} passed password; awaiting 2fa",
+                        name=user.name,
+                    )
+                    db.session.close()
+                    return redirect(url_for("auth.two_factor"))
+
+                establish_user_session(user)
                 log("logins", "[{date}] {ip} - {name} logged in", name=user.name)
 
                 db.session.close()
@@ -511,6 +549,75 @@ def login():
     else:
         db.session.close()
         return render_template("login.html", errors=errors)
+
+
+def _clear_pending_two_factor():
+    attempt_key = session.pop("two_factor_attempt_key", None)
+    session.pop("two_factor_user_id", None)
+    if attempt_key:
+        clear_failed_second_factor(attempt_key)
+
+
+@auth.route("/login/two_factor", methods=["POST", "GET"])
+@ratelimit(method="POST", limit=20, interval=60)
+def two_factor():
+    errors = get_errors()
+
+    pending_user_id = session.get("two_factor_user_id")
+    if pending_user_id is None:
+        return redirect(url_for("auth.login"))
+
+    user = Users.query.filter_by(id=pending_user_id).first()
+    if user is None or not user.totp_secret:
+        # The pending login is stale or no longer valid; restart the login
+        _clear_pending_two_factor()
+        return redirect(url_for("auth.login"))
+
+    if request.method == "GET":
+        return render_template("two_factor.html", errors=errors)
+
+    code = request.form.get("code", "").strip()
+
+    # A valid TOTP code completes the login. Recovery codes are accepted as a
+    # fallback for users who have lost their authenticator device.
+    valid_totp = verify_and_consume_totp(user, code)
+    recovery_code = None if valid_totp else consume_recovery_code(user, code)
+
+    if valid_totp or recovery_code is not None:
+        _clear_pending_two_factor()
+        session.regenerate()
+        establish_user_session(user)
+        log(
+            "logins",
+            "[{date}] {ip} - {name} passed two factor authentication",
+            name=user.name,
+        )
+        db.session.close()
+        if request.args.get("next") and validators.is_safe_url(
+            request.args.get("next")
+        ):
+            return redirect(request.args.get("next"))
+        return redirect(url_for("challenges.listing"))
+
+    attempts = register_failed_second_factor(session["two_factor_attempt_key"])
+    if attempts >= LOGIN_ATTEMPT_LIMIT:
+        log(
+            "logins",
+            "[{date}] {ip} - too many invalid two factor codes for {name}",
+            name=user.name,
+        )
+        _clear_pending_two_factor()
+        db.session.close()
+        return redirect(url_for("auth.login"))
+
+    log(
+        "logins",
+        "[{date}] {ip} - submitted invalid two factor code for {name}",
+        name=user.name,
+    )
+    db.session.close()
+    errors.append(_l("Invalid two factor authentication code"))
+    return render_template("two_factor.html", errors=errors), 200
 
 
 @auth.route("/oauth")
@@ -677,4 +784,8 @@ def oauth_redirect():
 def logout():
     if current_user.authed():
         logout_user()
+    else:
+        # A user may be halfway through the second login factor; drop that
+        # pending state as well so the login process can be restarted.
+        _clear_pending_two_factor()
     return redirect(url_for("views.static_html"))

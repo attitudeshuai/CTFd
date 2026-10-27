@@ -70,6 +70,18 @@ class LoginForm(BaseForm):
     submit = SubmitField(_l("Submit"))
 
 
+class TwoFactorLoginForm(BaseForm):
+    code = StringField(
+        _l("Two Factor Authentication Code"),
+        validators=[InputRequired()],
+        render_kw={"autofocus": True, "autocomplete": "one-time-code"},
+        description=_l(
+            "Enter the code from your authenticator app or an unused recovery code"
+        ),
+    )
+    submit = SubmitField(_l("Submit"))
+
+
 class ConfirmForm(BaseForm):
     submit = SubmitField(_l("Send Confirmation Email"))
 

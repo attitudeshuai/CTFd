@@ -15,7 +15,7 @@ from jinja2.exceptions import TemplateNotFound
 from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import safe_join
 
-from CTFd.cache import cache
+from CTFd.cache import cache, clear_user_session
 from CTFd.constants.config import (
     AccountVisibilityTypes,
     ChallengeVisibilityTypes,
@@ -31,6 +31,7 @@ from CTFd.models import (
     Pages,
     Solutions,
     Teams,
+    UserRecoveryCodes,
     Users,
     UserTokens,
     db,
@@ -41,14 +42,23 @@ from CTFd.utils import validators
 from CTFd.utils.config import can_send_mail, is_setup, is_teams_mode
 from CTFd.utils.config.pages import build_markdown, get_page
 from CTFd.utils.config.visibility import challenges_visible
+from CTFd.utils.crypto import verify_password
 from CTFd.utils.dates import ctf_ended, ctftime, view_after_ctf
 from CTFd.utils.decorators import authed_only
 from CTFd.utils.health import check_config, check_database
-from CTFd.utils.helpers import get_errors, get_infos, markup
+from CTFd.utils.helpers import error_for, get_errors, get_infos, info_for, markup
 from CTFd.utils.modes import USERS_MODE
 from CTFd.utils.modules import can_access_challenge
 from CTFd.utils.security.auth import login_user
 from CTFd.utils.security.csrf import generate_nonce
+from CTFd.utils.security.twofactor import (
+    RECOVERY_CODE_LOW_COUNT,
+    build_otpauth_uri,
+    count_remaining_recovery_codes,
+    generate_totp_secret,
+    issue_recovery_codes,
+    verify_totp,
+)
 from CTFd.utils.security.signing import (
     BadSignature,
     BadTimeSignature,
@@ -332,6 +342,10 @@ def settings():
             )
         )
 
+    recovery_codes_remaining = 0
+    if user.two_factor_enabled:
+        recovery_codes_remaining = count_remaining_recovery_codes(user)
+
     return render_template(
         "settings.html",
         name=user.name,
@@ -342,8 +356,140 @@ def settings():
         country=user.country,
         tokens=tokens,
         prevent_name_change=prevent_name_change,
+        twofactor_enabled=user.two_factor_enabled,
+        twofactor_can_enable=user.can_enable_two_factor,
+        recovery_codes_remaining=recovery_codes_remaining,
+        recovery_codes_low=recovery_codes_remaining <= RECOVERY_CODE_LOW_COUNT,
         infos=infos,
         errors=errors,
+    )
+
+
+def _render_twofactor_setup(user, secret, errors=None):
+    ctf_name = get_config("ctf_name", default="CTFd")
+    otpauth_uri = build_otpauth_uri(secret=secret, account=user.name, issuer=ctf_name)
+    return render_template(
+        "twofactor/setup.html",
+        secret=secret,
+        otpauth_uri=otpauth_uri,
+        errors=errors or [],
+    )
+
+
+@views.route("/settings/two_factor/setup", methods=["GET", "POST"])
+@authed_only
+def two_factor_setup():
+    user = get_current_user()
+
+    # Two factor authentication is only available to accounts with a password.
+    # OAuth-only accounts cannot enroll.
+    if user.password is None:
+        abort(403)
+
+    if user.totp_secret:
+        return redirect(url_for("views.settings"))
+
+    # The pending secret lives only in the session. Starting or restarting the
+    # setup rotates it; nothing is persisted until the code is confirmed.
+    secret = generate_totp_secret()
+    session["totp_setup_secret"] = secret
+    return _render_twofactor_setup(user, secret)
+
+
+@views.route("/settings/two_factor/confirm", methods=["POST"])
+@authed_only
+def two_factor_confirm():
+    user = get_current_user()
+
+    if user.password is None:
+        abort(403)
+
+    if user.totp_secret:
+        return redirect(url_for("views.settings"))
+
+    secret = session.get("totp_setup_secret")
+    if secret is None:
+        return redirect(url_for("views.two_factor_setup"))
+
+    code = request.form.get("code", "").strip()
+    if verify_totp(secret, code) is False:
+        # Keep the pending secret so the user can retry without restarting.
+        return (
+            _render_twofactor_setup(
+                user, secret, errors=["Invalid two factor authentication code"]
+            ),
+            400,
+        )
+
+    user.totp_secret = secret
+    db.session.commit()
+    session.pop("totp_setup_secret", None)
+
+    recovery_codes = issue_recovery_codes(user)
+    clear_user_session(user_id=user.id)
+
+    return (
+        render_template(
+            "twofactor/recovery_codes.html", recovery_codes=recovery_codes
+        ),
+        200,
+    )
+
+
+@views.route("/settings/two_factor/disable", methods=["POST"])
+@authed_only
+def two_factor_disable():
+    user = get_current_user()
+
+    if user.password is None:
+        abort(403)
+
+    if not user.totp_secret:
+        return redirect(url_for("views.settings"))
+
+    password = request.form.get("password", "")
+    code = request.form.get("code", "").strip()
+
+    if verify_password(password, user.password) is False:
+        error_for("views.settings", "Your current password is incorrect")
+        return redirect(url_for("views.settings"))
+
+    if verify_totp(user.totp_secret, code) is False:
+        error_for("views.settings", "Invalid two factor authentication code")
+        return redirect(url_for("views.settings"))
+
+    user.totp_secret = None
+    for recovery_code in UserRecoveryCodes.query.filter_by(user_id=user.id).all():
+        db.session.delete(recovery_code)
+    db.session.commit()
+    clear_user_session(user_id=user.id)
+
+    info_for("views.settings", "Two factor authentication has been disabled.")
+    return redirect(url_for("views.settings"))
+
+
+@views.route("/settings/two_factor/recovery/regenerate", methods=["POST"])
+@authed_only
+def two_factor_recovery_regenerate():
+    user = get_current_user()
+
+    if user.password is None:
+        abort(403)
+
+    if not user.totp_secret:
+        return redirect(url_for("views.settings"))
+
+    code = request.form.get("code", "").strip()
+    if verify_totp(user.totp_secret, code) is False:
+        error_for("views.settings", "Invalid two factor authentication code")
+        return redirect(url_for("views.settings"))
+
+    recovery_codes = issue_recovery_codes(user)
+    return (
+        render_template(
+            "twofactor/recovery_codes.html", recovery_codes=recovery_codes
+        ),
+        200,
     )
 
 

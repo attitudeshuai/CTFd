@@ -3,7 +3,8 @@
 	{% set verify_emails = "true" if verify_emails == True else "false" %}
 	{% set name_changes = "true" if name_changes == True else "false" %}
 	{% set team_creation = "false" if team_creation == False else "true" %}
-	{% with form = Forms.config.AccountSettingsForm(verify_emails=verify_emails, name_changes=name_changes, team_disbanding=team_disbanding, team_creation=team_creation) %}
+	{% set two_factor_required = two_factor_required if two_factor_required else "off" %}
+	{% with form = Forms.config.AccountSettingsForm(verify_emails=verify_emails, name_changes=name_changes, team_disbanding=team_disbanding, team_creation=team_creation, two_factor_required=two_factor_required) %}
 	<form method="POST" autocomplete="off" class="w-100">
 		<ul class="nav nav-tabs mb-3">
 			<li class="nav-item">
@@ -74,6 +75,14 @@
 						{{ form.name_changes(class="form-control custom-select") }}
 						<small class="form-text text-muted">
 							{{ form.name_changes.description }}
+						</small>
+					</div>
+
+					<div class="form-group">
+						{{ form.two_factor_required.label }}
+						{{ form.two_factor_required(class="form-control custom-select") }}
+						<small class="form-text text-muted">
+							{{ form.two_factor_required.description }}
 						</small>
 					</div>
 				</div>

@@ -25,6 +25,13 @@
               role="tab"
           >{% trans %}Access Tokens{% endtrans %}
           </button>
+          {% if twofactor_can_enable %}
+            <button
+                class="nav-link" id="settings-twofactor-tab" data-bs-toggle="pill"
+                data-bs-target="#twofactor" role="tab"
+            >{% trans %}Two Factor Authentication{% endtrans %}
+            </button>
+          {% endif %}
         </div>
       </div>
 
@@ -255,6 +262,83 @@
             {% endif %}
 
           </div>
+
+          {% if twofactor_can_enable %}
+            <div class="tab-pane fade" id="twofactor" role="tabpanel">
+              {% include "components/errors.html" %}
+
+              <div class="alert alert-info">
+                {% trans %}API access tokens are not affected by two factor authentication.{% endtrans %}
+              </div>
+
+              {% if not twofactor_enabled %}
+                <p>
+                  {% trans %}Two factor authentication adds an additional login step using a code from an authenticator app.{% endtrans %}
+                </p>
+                <a class="btn btn-primary px-4"
+                   href="{{ url_for('views.two_factor_setup') }}">
+                  {% trans %}Enable Two Factor Authentication{% endtrans %}
+                </a>
+              {% else %}
+                <div class="alert alert-success">
+                  <strong>{% trans %}Two factor authentication is enabled{% endtrans %}</strong>
+                </div>
+
+                <p>
+                  {% set remaining_text %}{{ recovery_codes_remaining }} {% trans %}recovery codes remaining{% endtrans %}{% endset %}
+                  {{ remaining_text }}
+                </p>
+
+                {% if recovery_codes_remaining == 0 %}
+                  <div class="alert alert-danger">
+                    {% trans %}You have no recovery codes left. Please generate new recovery codes.{% endtrans %}
+                  </div>
+                {% elif recovery_codes_low %}
+                  <div class="alert alert-warning">
+                    {% trans %}You are running low on recovery codes. Please generate new recovery codes.{% endtrans %}
+                  </div>
+                {% endif %}
+
+                <hr>
+
+                {% with form = Forms.self.TwoFactorRecoveryForm() %}
+                  <h5>{% trans %}Generate new recovery codes{% endtrans %}</h5>
+                  <p class="text-muted">
+                    {% trans %}This invalidates all existing recovery codes. Enter a current authenticator code to continue.{% endtrans %}
+                  </p>
+                  <form method="post"
+                        action="{{ url_for('views.two_factor_recovery_regenerate') }}"
+                        accept-charset="utf-8" autocomplete="off" class="mb-4">
+                    <div class="mb-3">
+                      <b>{{ form.code.label(class="form-label") }}</b>
+                      {{ form.code(class="form-control", style="max-width: 240px;") }}
+                    </div>
+                    {{ form.submit(class="btn btn-secondary") }}
+                    {{ form.nonce() }}
+                  </form>
+                {% endwith %}
+
+                <hr>
+
+                {% with form = Forms.self.TwoFactorDisableForm() %}
+                  <h5>{% trans %}Disable two factor authentication{% endtrans %}</h5>
+                  <form method="post" action="{{ url_for('views.two_factor_disable') }}"
+                        accept-charset="utf-8" autocomplete="off">
+                    <div class="mb-3">
+                      <b>{{ form.password.label(class="form-label") }}</b>
+                      {{ form.password(class="form-control", style="max-width: 360px;") }}
+                    </div>
+                    <div class="mb-3">
+                      <b>{{ form.code.label(class="form-label") }}</b>
+                      {{ form.code(class="form-control", style="max-width: 240px;") }}
+                    </div>
+                    {{ form.submit(class="btn btn-danger") }}
+                    {{ form.nonce() }}
+                  </form>
+                {% endwith %}
+              {% endif %}
+            </div>
+          {% endif %}
         </div>
       </div>
     </div>

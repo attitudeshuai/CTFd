@@ -187,6 +187,43 @@
 			</a>
 			{% endif %}
 		</div>
+
+		{% if user.password %}
+			<hr class="w-50">
+			<div class="pt-2">
+				{% with messages = get_flashed_messages(with_categories=true) %}
+					{% for category, message in messages %}
+						<div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} text-center"
+							 role="alert">
+							{{ message }}
+						</div>
+					{% endfor %}
+				{% endwith %}
+
+				<h3 class="text-center">
+					{% trans %}Two Factor Authentication{% endtrans %}
+					{% if user.totp_secret %}
+						<span class="badge badge-success">{% trans %}enabled{% endtrans %}</span>
+					{% else %}
+						<span class="badge badge-secondary">{% trans %}disabled{% endtrans %}</span>
+					{% endif %}
+				</h3>
+				{% if user.totp_secret %}
+					<form method="post" class="pt-2"
+						  action="{{ url_for('admin.users_reset_two_factor', user_id=user.id) }}">
+						<input type="hidden" name="nonce" value="{{ session.nonce }}">
+						<button type="submit" class="btn btn-sm btn-outline-danger"
+								onclick="return confirm('Reset two factor authentication for this user?')">
+							<i class="fas fa-shield-halved"></i>
+							{% trans %}Reset Two Factor Authentication{% endtrans %}
+						</button>
+					</form>
+					<small class="form-text text-muted">
+						{% trans %}Removes the current authenticator and all recovery codes. The user must enroll again after their next login.{% endtrans %}
+					</small>
+				{% endif %}
+			</div>
+		{% endif %}
 	</div>
 </div>
 

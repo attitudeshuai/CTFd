@@ -2,6 +2,7 @@ from flask import session
 from flask_babel import lazy_gettext as _l
 from wtforms import PasswordField, SelectField, StringField, TextAreaField
 from wtforms.fields.html5 import DateField, URLField
+from wtforms.validators import InputRequired
 
 from CTFd.constants.languages import SELECT_LANGUAGE_LIST
 from CTFd.forms import BaseForm
@@ -59,3 +60,39 @@ class TokensForm(BaseForm):
     expiration = DateField(_l("Expiration"))
     description = TextAreaField("Usage Description")
     submit = SubmitField(_l("Generate"))
+
+
+class TwoFactorSetupForm(BaseForm):
+    submit = SubmitField(_l("Begin Setup"))
+
+
+class TwoFactorConfirmForm(BaseForm):
+    code = StringField(
+        _l("Authentication Code"),
+        validators=[InputRequired()],
+        render_kw={"autocomplete": "one-time-code", "inputmode": "numeric"},
+    )
+    submit = SubmitField(_l("Enable Two Factor Authentication"))
+
+
+class TwoFactorDisableForm(BaseForm):
+    password = PasswordField(
+        _l("Current Password"),
+        validators=[InputRequired()],
+        render_kw={"autocomplete": "current-password"},
+    )
+    code = StringField(
+        _l("Authentication Code"),
+        validators=[InputRequired()],
+        render_kw={"autocomplete": "one-time-code", "inputmode": "numeric"},
+    )
+    submit = SubmitField(_l("Disable Two Factor Authentication"))
+
+
+class TwoFactorRecoveryForm(BaseForm):
+    code = StringField(
+        _l("Authentication Code"),
+        validators=[InputRequired()],
+        render_kw={"autocomplete": "one-time-code", "inputmode": "numeric"},
+    )
+    submit = SubmitField(_l("Regenerate Recovery Codes"))

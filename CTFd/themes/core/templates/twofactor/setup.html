@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="jumbotron">
+    <div class="container">
+      <h1>
+        {% trans %}Two Factor Authentication{% endtrans %}
+      </h1>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col offset-md-2 col-lg-8 offset-lg-2">
+        {% include "components/errors.html" %}
+
+        {% with form = Forms.self.TwoFactorConfirmForm() %}
+          <form method="post" action="{{ url_for('views.two_factor_confirm') }}"
+                accept-charset="utf-8" autocomplete="off">
+            <p>
+              {% trans %}Scan the QR code below with an authenticator app (such as Google Authenticator, Authy or 1Password) and enter the generated code to finish enabling two factor authentication.{% endtrans %}
+            </p>
+
+            <div class="row align-items-center mb-4">
+              <div class="col-md-4 text-center">
+                <div id="twofactor-qr" data-otpauth="{{ otpauth_uri }}"></div>
+              </div>
+              <div class="col-md-8">
+                <div class="mb-3">
+                  <b>{% trans %}Secret key{% endtrans %}</b>
+                  <div class="input-group">
+                    <input type="text" class="form-control bg-white" id="twofactor-secret"
+                           value="{{ secret }}" readonly>
+                    <button class="btn btn-outline-secondary px-3" type="button"
+                            onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('twofactor-secret').value)">
+                      <i class="fas fa-clipboard"></i>
+                    </button>
+                  </div>
+                  <small class="form-text text-muted">
+                    {% trans %}You can also type this key into your authenticator app manually.{% endtrans %}
+                  </small>
+                </div>
+
+                <div class="mb-3 d-none">
+                  <code id="twofactor-uri">{{ otpauth_uri }}</code>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <b>
+                {{ form.code.label(class="form-label") }}
+                <span class="text-danger">*</span>
+              </b>
+              {{ form.code(class="form-control") }}
+            </div>
+
+            <div class="mb-3">
+              {{ form.submit(class="btn btn-primary float-end px-4") }}
+            </div>
+
+            {{ form.nonce() }}
+          </form>
+        {% endwith %}
+
+        <div class="clearfix"></div>
+        <hr>
+        <a href="{{ url_for('views.settings') }}">
+          {% trans %}Back to settings{% endtrans %}
+        </a>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/themes/core/static/assets/vendor/qrcode-generator.js"></script>
+  <script>
+    (function () {
+      var el = document.getElementById("twofactor-qr");
+      var uri = el.getAttribute("data-otpauth");
+      if (window.qrcode) {
+        var qr = qrcode(0, "M");
+        qr.addData(uri);
+        qr.make();
+        el.innerHTML = qr.createSvgTag({cellSize: 4, margin: 1, scalable: true});
+      }
+    })();
+  </script>
+{% endblock %}

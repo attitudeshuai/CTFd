@@ -39,9 +39,11 @@ from CTFd.utils.security.email import (
     generate_password_reset_token,
     verify_reset_password_token,
 )
+from CTFd.utils.security.twofactor import two_factor_required_for_user
 from CTFd.utils.user import (
     authed,
     get_current_team_attrs,
+    get_current_user,
     get_current_user_attrs,
     get_current_user_recent_tracking,
     get_ip,
@@ -381,6 +383,56 @@ def init_request_processors(app):
                 if user.team and user.team.banned:
                     abort(403, description="Your team has been banned from this CTF")
                 login_user(user)
+
+    @app.before_request
+    def two_factor_required():
+        # API access tokens authenticate via the Authorization header and are
+        # intentionally unaffected by two factor authentication.
+        if request.headers.get("Authorization"):
+            return
+
+        # Endpoints needed to log out, enroll or reach the settings page.
+        allowed_endpoints = (
+            "views.themes",
+            "views.themes_beta",
+            "views.settings",
+            "views.two_factor_setup",
+            "views.two_factor_confirm",
+            "views.two_factor_disable",
+            "views.two_factor_recovery_regenerate",
+            "auth.logout",
+            "auth.reset_password",
+            "auth.confirm",
+        )
+        if request.endpoint in allowed_endpoints:
+            return
+
+        if not authed():
+            return
+
+        # Enforcement is stamped onto the session at login time so changing
+        # the policy never kicks existing sessions.
+        if session.get("two_factor_enforced") is not True:
+            return
+
+        user = get_current_user()
+        if user is None:
+            return
+
+        # The live policy still has to cover this user (admins/all) and the
+        # user must not have enrolled yet. Relaxing the policy immediately
+        # releases the gate; OAuth-only accounts are always exempt.
+        if user.totp_secret or not two_factor_required_for_user(user):
+            return
+
+        if (
+            request.is_json
+            or request.accept_mimetypes.best == "application/json"
+            or request.accept_mimetypes.best == "text/event-stream"
+        ):
+            abort(403)
+
+        return redirect(url_for("views.two_factor_setup"))
 
     @app.before_request
     def csrf():

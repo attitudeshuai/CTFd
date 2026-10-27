@@ -88,6 +88,20 @@ class AccountSettingsForm(BaseForm):
         choices=[("true", "Enabled"), ("false", "Disabled")],
         default="false",
     )
+    two_factor_required = SelectField(
+        "Require Two Factor Authentication",
+        description=(
+            "Control who must enable two factor authentication. API access "
+            "tokens remain unaffected. Accounts without a password (OAuth "
+            "only) are exempt"
+        ),
+        choices=[
+            ("off", "Disabled"),
+            ("admins", "Admins only"),
+            ("all", "All users"),
+        ],
+        default="off",
+    )
     team_disbanding = SelectField(
         "Team Disbanding",
         description="Control whether team captains are allowed to disband their own teams",
