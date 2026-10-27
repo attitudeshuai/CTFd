@@ -144,6 +144,11 @@
 	<div class="jumbotron">
 		<div class="container">
 			<h1 id="team-id" team-id="{{ team.id }}">{{ team.name }}</h1>
+			{% if captain_state == "orphaned" %}
+				<h3><span class="badge badge-warning">This team has no captain. Please contact an administrator.</span></h3>
+			{% elif captain_state == "banned" %}
+				<h3><span class="badge badge-warning">The team captain is unavailable. Please contact an administrator.</span></h3>
+			{% endif %}
 			{% if team.oauth_id %}
 				<a href="https://majorleaguecyber.org/t/{{ team.name }}">
 					<h3><span class="badge badge-primary">Official</span></h3>
@@ -186,7 +191,7 @@
 			</h2>
 			<div class="pt-3">
 				<a class="edit-team">
-					{% if team.captain_id == user.id %}
+					{% if captain and captain.id == user.id %}
 						<i class="btn-fa fas fa-cogs fa-2x px-2"
 						   data-toggle="tooltip"
 						   data-placement="top"
@@ -261,7 +266,7 @@
 								<a href="{{ url_for('users.public', user_id=member.id) }}">
 									{{ member.name }}
 								</a>
-								{% if team.captain_id == member.id %}
+								{% if captain and captain.id == member.id %}
 									<span class="badge badge-primary ml-2">Captain</span>
 								{% endif %}
 							</td>
@@ -372,7 +377,7 @@
 			'name': team.name,
 			'account_id': 'me',
 		} | tojson }};
-		var team_captain = {{ (user.id == team.captain_id) | tojson }};
+		var team_captain = {{ (captain and user.id == captain.id) | tojson }};
 	</script>
 	<script defer src="{{ url_for('views.themes', path='js/echarts.bundle.js') }}"></script>
 	{% if solves or awards %}

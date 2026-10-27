@@ -4,11 +4,11 @@
 		<label for="captain">Team Captain</label>
 		<select class="form-control custom-select" id="captain" name="captain_id">
 			{% if team is defined %}
-				<option value="{{ team.captain.id }}">{{ team.captain.name }}</option>
+				{% if team.captain is none %}
+					<option value="" selected disabled>-- select a captain --</option>
+				{% endif %}
 				{% for member in team.members %}
-					{% if member.id != team.captain.id %}
-						<option value="{{ member.id }}">{{ member.name }}</option>
-					{% endif %}
+					<option value="{{ member.id }}"{% if team.captain_id == member.id %} selected{% endif %}>{{ member.name }}</option>
 				{% endfor %}
 			{% endif %}
 		</select>

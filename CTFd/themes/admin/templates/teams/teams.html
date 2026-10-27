@@ -33,7 +33,15 @@
 				<div class="form-group col-md-2">
 					{{ form.field(class="form-control custom-select w-100") }}
 				</div>
-				<div class="form-group col-md-8">
+				<div class="form-group col-md-2">
+					<select class="form-control custom-select w-100" name="captain">
+						<option value=""{% if not captain %} selected{% endif %}>All captain states</option>
+						<option value="active"{% if captain == "active" %} selected{% endif %}>Captain active</option>
+						<option value="orphaned"{% if captain == "orphaned" %} selected{% endif %}>No captain</option>
+						<option value="banned"{% if captain == "banned" %} selected{% endif %}>Captain unavailable</option>
+					</select>
+				</div>
+				<div class="form-group col-md-6">
 					{{ form.q(class="form-control w-100", placeholder="Search for matching teams") }}
 				</div>
 				<div class="form-group col-md-2">
@@ -100,6 +108,11 @@
 								<a href="https://majorleaguecyber.org/t/{{ team.name }}">
 									<span class="badge badge-primary">Official</span>
 								</a>
+							{% endif %}
+							{% if captain_states.get(team.id) == "orphaned" %}
+								<span class="badge badge-warning">no captain</span>
+							{% elif captain_states.get(team.id) == "banned" %}
+								<span class="badge badge-secondary">captain unavailable</span>
 							{% endif %}
 							{% if team.website %}
 								<a href="{{ team.website }}" target="_blank" class="badge badge-info" rel="noopener">

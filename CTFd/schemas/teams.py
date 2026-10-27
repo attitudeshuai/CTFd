@@ -6,6 +6,7 @@ from sqlalchemy.orm import load_only
 from CTFd.models import Brackets, TeamFieldEntries, TeamFields, Teams, Users, ma
 from CTFd.schemas.fields import TeamFieldEntriesSchema
 from CTFd.utils import get_config, string_types
+from CTFd.utils.captains import is_current_user_captain
 from CTFd.utils.crypto import verify_password
 from CTFd.utils.user import get_current_team, get_current_user, is_admin
 from CTFd.utils.validators import validate_country_code
@@ -140,7 +141,7 @@ class TeamSchema(ma.ModelSchema):
             current_team = get_current_team()
             current_user = get_current_user()
 
-            if current_team.captain_id != current_user.id:
+            if is_current_user_captain(current_team) is False:
                 raise ValidationError(
                     "Only the captain can change the team password",
                     field_names=["captain_id"],
@@ -190,8 +191,9 @@ class TeamSchema(ma.ModelSchema):
                 raise ValidationError("Invalid Captain ID", field_names=["captain_id"])
         else:
             current_team = get_current_team()
-            current_user = get_current_user()
-            if current_team.captain_id == current_user.id:
+            # The write authorization is resolved through the captain tenure
+            # chain: only the currently effective captain may transfer.
+            if is_current_user_captain(current_team):
                 captain = Users.query.filter_by(id=captain_id).first()
                 if captain in current_team.members:
                     return

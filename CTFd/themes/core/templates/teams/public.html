@@ -106,7 +106,7 @@
                 {% if member.bracket_id %}
                   <span class="badge bg-secondary ms-2">{{ member.bracket.name }}</span>
                 {% endif %}
-                {% if team.captain_id == member.id %}
+                {% if captain and captain.id == member.id %}
                   <span class="badge bg-primary ms-2">{% trans %}Captain{% endtrans %}</span>
                 {% endif %}
               </td>

@@ -4,6 +4,7 @@ from CTFd.cache import clear_team_session, clear_user_session
 from CTFd.exceptions import TeamTokenExpiredException, TeamTokenInvalidException
 from CTFd.models import Brackets, TeamFieldEntries, TeamFields, Teams, db
 from CTFd.utils import config, get_config, validators
+from CTFd.utils.captains import get_captain, get_captain_state
 from CTFd.utils.crypto import verify_password
 from CTFd.utils.decorators import authed_only, ratelimit, registered_only
 from CTFd.utils.decorators.modes import require_team_mode
@@ -362,6 +363,8 @@ def private():
         awards=awards,
         user=user,
         team=team,
+        captain=get_captain(team),
+        captain_state=get_captain_state(team),
         score=score,
         place=place,
         score_frozen=config.is_scoreboard_frozen(),
@@ -395,6 +398,8 @@ def public(team_id):
         solves=solves,
         awards=awards,
         team=team,
+        captain=get_captain(team),
+        captain_state=get_captain_state(team),
         score=score,
         place=place,
         score_frozen=config.is_scoreboard_frozen(),

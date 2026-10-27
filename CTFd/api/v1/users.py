@@ -9,13 +9,19 @@ from CTFd.api.v1.schemas import (
     APIDetailedSuccessResponse,
     PaginatedAPIListSuccessResponse,
 )
-from CTFd.cache import clear_challenges, clear_standings, clear_user_session
+from CTFd.cache import (
+    clear_challenges,
+    clear_standings,
+    clear_team_session,
+    clear_user_session,
+)
 from CTFd.constants import RawEnum
 from CTFd.models import (
     Awards,
     Notifications,
     Solves,
     Submissions,
+    Teams,
     Tracking,
     Unlocks,
     Users,
@@ -24,6 +30,7 @@ from CTFd.models import (
 from CTFd.schemas.awards import AwardSchema
 from CTFd.schemas.submissions import SubmissionSchema
 from CTFd.schemas.users import UserSchema
+from CTFd.utils.captains import succeed_captain_after_deletion
 from CTFd.utils.challenges import get_submissions_for_user_id_for_challenge_id
 from CTFd.utils.config import get_config, get_mail_provider
 from CTFd.utils.decorators import admins_only, authed_only, ratelimit
@@ -276,6 +283,15 @@ class UserPublic(Resource):
                 400,
             )
 
+        # Capture teams captained by this user so the tenure chain can
+        # resolve succession immediately after the account is deleted.
+        captained_team_ids = [
+            team_id
+            for (team_id,) in db.session.query(Teams.id)
+            .filter_by(captain_id=user_id)
+            .all()
+        ]
+
         Notifications.query.filter_by(user_id=user_id).delete()
         Awards.query.filter_by(user_id=user_id).delete()
         Unlocks.query.filter_by(user_id=user_id).delete()
@@ -284,6 +300,16 @@ class UserPublic(Resource):
         Tracking.query.filter_by(user_id=user_id).delete()
         Users.query.filter_by(id=user_id).delete()
         db.session.commit()
+
+        # Succession/takeover is a chain write action, not an afterthought:
+        # hand the team to the earliest eligible member, or mark it orphaned.
+        for team_id in captained_team_ids:
+            team = Teams.query.filter_by(id=team_id).first()
+            if team is not None:
+                succeed_captain_after_deletion(team)
+                db.session.commit()
+                clear_team_session(team_id=team_id)
+
         db.session.close()
 
         clear_user_session(user_id=user_id)

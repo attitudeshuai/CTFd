@@ -1,6 +1,6 @@
 from typing import List
 
-from flask import abort, request, session
+from flask import abort, request
 from flask_restx import Namespace, Resource
 
 from CTFd.api.v1.helpers.request import validate_args
@@ -21,6 +21,13 @@ from CTFd.schemas.awards import AwardSchema
 from CTFd.schemas.submissions import SubmissionSchema
 from CTFd.schemas.teams import TeamSchema
 from CTFd.utils import get_config
+from CTFd.utils.captains import (
+    CAPTAIN_STATES,
+    get_captain_filters,
+    is_current_user_captain,
+    locked_team,
+    transfer_captain,
+)
 from CTFd.utils.decorators import admins_only, authed_only, require_team
 from CTFd.utils.decorators.modes import require_team_mode
 from CTFd.utils.decorators.visibility import (
@@ -59,6 +66,26 @@ teams_namespace.schema_model(
 )
 
 
+def _record_captain_transfer(team, data, old_captain_id):
+    """
+    Run an actual captain change through the tenure chain: re-read the team
+    row under a lock, move the pointer and record a team notification.
+    Called inside the request transaction before commit. The schema has
+    already authorized the actor and validated the target, so a ValueError
+    here means the state changed concurrently and is reported as 400.
+    """
+    captain_id = data.get("captain_id")
+    if captain_id is None or old_captain_id == int(captain_id):
+        return
+
+    locked = locked_team(team.id)
+    new_captain = Users.query.filter_by(id=int(captain_id)).first()
+    try:
+        transfer_captain(locked, new_captain)
+    except ValueError:
+        abort(400, description="Invalid Captain ID")
+
+
 @teams_namespace.route("")
 class TeamList(Resource):
     method_decorators = [require_team_mode]
@@ -94,12 +121,22 @@ class TeamList(Resource):
                 ),
                 None,
             ),
+            "captain": (
+                RawEnum(
+                    "CaptainStates",
+                    {state: state for state in CAPTAIN_STATES},
+                ),
+                None,
+            ),
         },
         location="query",
     )
     def get(self, query_args):
         q = query_args.pop("q", None)
         field = str(query_args.pop("field", None))
+        # RawEnum values are parsed into enum members; normalize to a string
+        captain = query_args.pop("captain", None)
+        captain = str(captain) if captain is not None else None
 
         if field == "email":
             if is_admin() is False:
@@ -110,10 +147,17 @@ class TeamList(Resource):
 
         filters = build_model_filters(model=Teams, query=q, field=field)
 
+        # Captain state filters share the chain's resolution semantics and
+        # only apply to the admin view; public listings ignore the argument.
+        captain_filters = []
+        if is_admin() and request.args.get("view") == "admin" and captain:
+            captain_filters = get_captain_filters(captain)
+
         if is_admin() and request.args.get("view") == "admin":
             teams = (
                 Teams.query.filter_by(**query_args)
                 .filter(*filters)
+                .filter(*captain_filters)
                 .paginate(per_page=50, max_per_page=100, error_out=False)
             )
         else:
@@ -223,6 +267,7 @@ class TeamPublic(Resource):
     )
     def patch(self, team_id):
         team = Teams.query.filter_by(id=team_id).first_or_404()
+        old_captain_id = team.captain_id
         data = request.get_json()
         data["id"] = team_id
 
@@ -231,6 +276,10 @@ class TeamPublic(Resource):
         response = schema.load(data)
         if response.errors:
             return {"success": False, "errors": response.errors}, 400
+
+        # Admin captain appointments (including banned/orphaned takeovers)
+        # are chain write actions: locked pointer update + team notification.
+        _record_captain_transfer(team, data, old_captain_id)
 
         response = schema.dump(response.data)
         db.session.commit()
@@ -313,7 +362,7 @@ class TeamPrivate(Resource):
     )
     def patch(self):
         team = get_current_team()
-        if team.captain_id != session["id"]:
+        if is_current_user_captain(team) is False:
             return (
                 {
                     "success": False,
@@ -322,12 +371,17 @@ class TeamPrivate(Resource):
                 403,
             )
 
+        old_captain_id = team.captain_id
         data = request.get_json()
 
         response = TeamSchema(view="self", instance=team, partial=True).load(data)
 
         if response.errors:
             return {"success": False, "errors": response.errors}, 400
+
+        # Self transfer is a chain write action: locked pointer update plus
+        # a team notification recording the new captain.
+        _record_captain_transfer(team, data, old_captain_id)
 
         db.session.commit()
         clear_team_session(team_id=team.id)
@@ -354,7 +408,7 @@ class TeamPrivate(Resource):
             )
 
         team = get_current_team()
-        if team.captain_id != session["id"]:
+        if is_current_user_captain(team) is False:
             return (
                 {
                     "success": False,
@@ -412,7 +466,7 @@ class TeamPrivateMembers(Resource):
     @require_team
     def post(self):
         team = get_current_team()
-        if team.captain_id != session["id"]:
+        if is_current_user_captain(team) is False:
             return (
                 {
                     "success": False,

@@ -9,8 +9,36 @@ from CTFd.api.v1.schemas import APIDetailedSuccessResponse, APIListSuccessRespon
 from CTFd.constants import RawEnum
 from CTFd.models import Notifications, db
 from CTFd.schemas.notifications import NotificationSchema
+from CTFd.utils.captains import notification_visibility_filters
 from CTFd.utils.decorators import admins_only
 from CTFd.utils.helpers.models import build_model_filters
+from CTFd.utils.user import get_current_user_attrs, is_admin
+
+
+def _scoped_notification_query(query_args, *extra_filters):
+    """
+    Return a Notifications query restricted to what the current actor may
+    see. Admins see every notification (and may filter by team_id/user_id);
+    everyone else only sees global notifications plus notifications scoped
+    to their own team or user account.
+    """
+    query_args = dict(query_args)
+    filters = list(extra_filters)
+
+    if is_admin() is False:
+        user = get_current_user_attrs()
+        team_id = user.team_id if user else None
+        user_id = user.id if user else None
+
+        # Scope columns cannot be probed directly by non-admins.
+        query_args.pop("team_id", None)
+        query_args.pop("user_id", None)
+        filters.extend(
+            notification_visibility_filters(team_id=team_id, user_id=user_id)
+        )
+
+    return Notifications.query.filter_by(**query_args).filter(*filters)
+
 
 notifications_namespace = Namespace(
     "notifications", description="Endpoint to retrieve Notifications"
@@ -73,9 +101,7 @@ class NotificantionList(Resource):
         if since_id:
             filters.append((Notifications.id > since_id))
 
-        notifications = (
-            Notifications.query.filter_by(**query_args).filter(*filters).all()
-        )
+        notifications = _scoped_notification_query(query_args, *filters).all()
         schema = NotificationSchema(many=True)
         result = schema.dump(notifications)
         if result.errors:
@@ -110,9 +136,7 @@ class NotificantionList(Resource):
         if since_id:
             filters.append((Notifications.id > since_id))
 
-        notification_count = (
-            Notifications.query.filter_by(**query_args).filter(*filters).count()
-        )
+        notification_count = _scoped_notification_query(query_args, *filters).count()
         response = make_response()
         response.headers["Result-Count"] = notification_count
         return response
@@ -167,7 +191,9 @@ class Notification(Resource):
         },
     )
     def get(self, notification_id):
-        notif = Notifications.query.filter_by(id=notification_id).first_or_404()
+        # Notifications scoped to another team/account must look like they
+        # do not exist (404) to users without access to that scope.
+        notif = _scoped_notification_query({"id": notification_id}).first_or_404()
         schema = NotificationSchema()
         response = schema.dump(notif)
         if response.errors:

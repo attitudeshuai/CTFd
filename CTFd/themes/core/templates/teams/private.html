@@ -213,6 +213,19 @@
   <div class="jumbotron">
     <div class="container">
       <h1 id="team-id" team-id="{{ team.id }}">{{ team.name }}</h1>
+      {% if captain_state == "orphaned" %}
+        <h3>
+          <span class="badge text-bg-warning">
+            {% trans %}This team has no captain. Please contact an administrator.{% endtrans %}
+          </span>
+        </h3>
+      {% elif captain_state == "banned" %}
+        <h3>
+          <span class="badge text-bg-warning">
+            {% trans %}The team captain is unavailable. Please contact an administrator.{% endtrans %}
+          </span>
+        </h3>
+      {% endif %}
       {% if team.oauth_id %}
         <a href="https://majorleaguecyber.org/t/{{ team.name }}">
           <h3><span class="badge bg-primary">{% trans %}Official{% endtrans %}</span></h3>
@@ -269,6 +282,10 @@
         {% endif %}
       </h2>
 
+      {# Captain actions only render when an effective (active, non-banned)
+         captain exists. Orphaned/banned teams show the status banner above
+         and must wait for an admin takeover. #}
+      {% if captain_state == "active" %}
       <div x-data="CaptainMenu">
         <a class="edit-team text-white" @click="editTeam()">
           <i
@@ -300,6 +317,7 @@
           ></i>
         </a>
       </div>
+      {% endif %}
 
       <div class="pt-3">{% if team.website and (team.website.startswith('http://') or team.website.startswith('https://')) %}
           <a href="{{ team.website }}" target="_blank" style="color: inherit;" rel="noopener">
@@ -341,7 +359,7 @@
                 {% if member.bracket_id %}
                   <span class="badge bg-secondary ms-2">{{ member.bracket.name }}</span>
                 {% endif %}
-                {% if team.captain_id == member.id %}
+                {% if captain and captain.id == member.id %}
                   <span class="badge bg-primary ms-2">{% trans %}Captain{% endtrans %}</span>
                 {% endif %}
               </td>
@@ -494,7 +512,7 @@
         'account_id': 'me',
       } | tojson }};
 
-      window.team_captain = {{ (user.id == team.captain_id) | tojson }};
+      window.team_captain = {{ (captain and user.id == captain.id) | tojson }};
   </script>
   {{ Assets.js("assets/js/teams/private.js") }}
 {% endblock %}

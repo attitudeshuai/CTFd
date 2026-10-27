@@ -163,6 +163,11 @@
 			{% if team.banned %}
 				<span class="badge badge-danger">banned</span>
 			{% endif %}
+			{% if captain_state == "orphaned" %}
+				<span class="badge badge-warning">no captain</span>
+			{% elif captain_state == "banned" %}
+				<span class="badge badge-warning">captain unavailable</span>
+			{% endif %}
 		</div>
 
 		{% if team.oauth_id %}
@@ -275,7 +280,7 @@
 				{% for member in members %}
 					<tr>
 						<td class="text-center" data-href="{{ url_for('admin.users_detail', user_id=member.id) }}">
-							{% if team.captain_id == member.id %}
+							{% if captain and captain.id == member.id %}
 								<span class="badge badge-primary">Captain</span>
 							{% endif %}
 							{% if member.bracket_id %}

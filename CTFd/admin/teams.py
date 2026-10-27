@@ -3,6 +3,12 @@ from sqlalchemy.sql import not_
 
 from CTFd.admin import admin
 from CTFd.models import Challenges, Teams, Tracking
+from CTFd.utils.captains import (
+    CAPTAIN_STATES,
+    get_captain,
+    get_captain_filters,
+    get_captain_state,
+)
 from CTFd.utils.decorators import admins_only
 
 
@@ -11,6 +17,7 @@ from CTFd.utils.decorators import admins_only
 def teams_listing():
     q = request.args.get("q")
     field = request.args.get("field")
+    captain = request.args.get("captain")
     page = abs(request.args.get("page", 1, type=int))
     filters = []
 
@@ -19,11 +26,19 @@ def teams_listing():
         if Teams.__mapper__.has_property(field):
             filters.append(getattr(Teams, field).like("%{}%".format(q)))
 
+    # The captain state filter uses the same resolution as the tenure chain.
+    if captain in CAPTAIN_STATES:
+        filters.extend(get_captain_filters(captain))
+    else:
+        captain = None
+
     teams = (
         Teams.query.filter(*filters)
         .order_by(Teams.id.asc())
         .paginate(page=page, per_page=50, error_out=False)
     )
+
+    captain_states = {team.id: get_captain_state(team) for team in teams.items}
 
     args = dict(request.args)
     args.pop("page", 1)
@@ -35,6 +50,8 @@ def teams_listing():
         next_page=url_for(request.endpoint, page=teams.next_num, **args),
         q=q,
         field=field,
+        captain=captain,
+        captain_states=captain_states,
     )
 
 
@@ -76,6 +93,8 @@ def teams_detail(team_id):
         "admin/teams/team.html",
         team=team,
         members=members,
+        captain=get_captain(team),
+        captain_state=get_captain_state(team),
         score=score,
         place=place,
         solves=solves,

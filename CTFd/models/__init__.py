@@ -798,6 +798,24 @@ class Teams(db.Model):
             raise TeamTokenInvalidException
         return team
 
+    def get_captain_successor(self, exclude_user_id=None):
+        """
+        Resolve the deterministic captain successor for this team.
+
+        The successor is the active (not banned) member that joined earliest,
+        tie-broken by Users.id ascending. Banned members can never succeed.
+        ``exclude_user_id`` lets callers (e.g. the user deletion flow) resolve
+        the successor as if a specific member were already removed.
+        Returns None when no eligible member exists.
+        """
+        query = Users.query.filter(
+            Users.team_id == self.id,
+            Users.banned == False,  # noqa: E712
+        )
+        if exclude_user_id is not None:
+            query = query.filter(Users.id != exclude_user_id)
+        return query.order_by(Users.id.asc()).first()
+
     def get_solves(self, admin=False):
         from CTFd.utils import get_config
 
