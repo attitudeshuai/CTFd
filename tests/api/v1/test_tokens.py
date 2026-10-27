@@ -121,3 +121,96 @@ def test_api_token_delete():
             assert r.status_code == 404
             assert Tokens.query.count() == 1
     destroy_ctfd(app)
+
+
+def test_api_token_scope_defaults_to_full():
+    """Tokens created without specifying a scope get full scope"""
+    app = create_ctfd()
+    with app.app_context():
+        gen_user(app.db, name="user")
+        with login_as_user(app) as client:
+            r = client.post("/api/v1/tokens", json={})
+            assert r.status_code == 200
+            resp = r.get_json()
+            assert resp["data"]["scope"] == "full"
+            value = resp["data"]["value"]
+
+        token = Tokens.query.filter_by(value=value).first()
+        assert token.scope == "full"
+
+        with login_as_user(app) as client:
+            r = client.get("/api/v1/tokens", json="")
+            assert r.status_code == 200
+            assert r.get_json()["data"][0]["scope"] == "full"
+
+            r = client.get("/api/v1/tokens/" + str(token.id), json="")
+            assert r.status_code == 200
+            assert r.get_json()["data"]["scope"] == "full"
+    destroy_ctfd(app)
+
+
+def test_api_token_scope_read_only():
+    """A read-only scope can be selected at creation and is visible later"""
+    app = create_ctfd()
+    with app.app_context():
+        gen_user(app.db, name="user")
+        with login_as_user(app) as client:
+            r = client.post("/api/v1/tokens", json={"scope": "read_only"})
+            assert r.status_code == 200
+            resp = r.get_json()
+            assert resp["data"]["scope"] == "read_only"
+            token_id = resp["data"]["id"]
+            value = resp["data"]["value"]
+
+        token = Tokens.query.filter_by(value=value).first()
+        assert token.scope == "read_only"
+
+        with login_as_user(app) as client:
+            r = client.get("/api/v1/tokens", json="")
+            assert r.status_code == 200
+            scopes = [t["scope"] for t in r.get_json()["data"]]
+            assert "read_only" in scopes
+
+            r = client.get("/api/v1/tokens/" + str(token_id), json="")
+            assert r.status_code == 200
+            assert r.get_json()["data"]["scope"] == "read_only"
+    destroy_ctfd(app)
+
+
+def test_api_token_scope_invalid():
+    """An unknown scope is rejected without creating a token"""
+    app = create_ctfd()
+    with app.app_context():
+        gen_user(app.db, name="user")
+        with login_as_user(app) as client:
+            r = client.post("/api/v1/tokens", json={"scope": "superpowers"})
+            assert r.status_code == 400
+            resp = r.get_json()
+            assert resp["success"] is False
+            assert "scope" in resp["errors"]
+            assert Tokens.query.count() == 0
+    destroy_ctfd(app)
+
+
+def test_api_token_scope_is_immutable():
+    """A token scope cannot be changed after creation; recreate instead"""
+    app = create_ctfd()
+    with app.app_context():
+        user = gen_user(app.db, name="user")
+        token = generate_user_token(user, scope="read_only")
+        token_id = token.id
+
+        # The token detail endpoint exposes no PATCH/PUT handler at all
+        detail_rule = next(
+            rule
+            for rule in app.url_map.iter_rules()
+            if rule.rule == "/api/v1/tokens/<token_id>"
+        )
+        assert "PATCH" not in detail_rule.methods
+        assert "PUT" not in detail_rule.methods
+
+        with login_as_user(app) as client:
+            r = client.patch("/api/v1/tokens/" + str(token_id), json={"scope": "full"})
+            assert r.status_code in (404, 405)
+        assert Tokens.query.filter_by(id=token_id).first().scope == "read_only"
+    destroy_ctfd(app)

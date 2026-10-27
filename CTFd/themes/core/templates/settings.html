@@ -169,6 +169,14 @@
                   {{ form.description(class="form-control", rows="3") }}
                 </div>
 
+                <div class="mb-3">
+                  <b>{{ form.scope.label(class="form-label") }}</b>
+                  {{ form.scope(class="form-select") }}
+                  <small class="form-text text-muted">
+                    {% trans %}Read-only tokens can call query endpoints but cannot perform any write operations. The scope cannot be changed after creation; revoke and recreate the token to change it.{% endtrans %}
+                  </small>
+                </div>
+
                 <div class="row">
                   <div class="col">
                     {{ form.submit(class="btn btn-block btn-primary float-end px-4") }}
@@ -224,6 +232,7 @@
                     <th class="text-center">{% trans %}Created{% endtrans %}</th>
                     <th>{% trans %}Expiration{% endtrans %}</th>
                     <th>{% trans %}Description{% endtrans %}</th>
+                    <th>{% trans %}Scope{% endtrans %}</th>
                     <th>{% trans %}Delete{% endtrans %}</th>
                   </tr>
                   </thead>
@@ -238,6 +247,13 @@
                       </td>
                       <td>
                         <span>{{ token.description | default('', true) }}</span>
+                      </td>
+                      <td>
+                        {% if token.scope == "read_only" %}
+                          <span class="badge bg-secondary">{% trans %}Read-only{% endtrans %}</span>
+                        {% else %}
+                          <span class="badge bg-primary">{% trans %}Full{% endtrans %}</span>
+                        {% endif %}
                       </td>
                       <td class="text-center">
                         <span

@@ -58,4 +58,12 @@ def SettingsForm(*args, **kwargs):
 class TokensForm(BaseForm):
     expiration = DateField(_l("Expiration"))
     description = TextAreaField("Usage Description")
+    scope = SelectField(
+        _l("Scope"),
+        choices=[
+            ("full", _l("Full access")),
+            ("read_only", _l("Read-only (queries only)")),
+        ],
+        default="full",
+    )
     submit = SubmitField(_l("Generate"))

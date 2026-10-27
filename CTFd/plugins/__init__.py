@@ -8,6 +8,9 @@ from flask import send_file, send_from_directory, url_for
 
 from CTFd.utils.config.pages import get_pages
 from CTFd.utils.decorators import admins_only as admins_only_wrapper
+from CTFd.utils.decorators import (
+    read_only_token_allowed as read_only_token_allowed_wrapper,
+)
 from CTFd.utils.plugins import override_function as utils_override_function
 from CTFd.utils.plugins import override_template as utils_override_template
 from CTFd.utils.plugins import (
@@ -177,6 +180,21 @@ def bypass_csrf_protection(f):
     """
     f._bypass_csrf = True
     return f
+
+
+def read_only_token_allowed(f):
+    """
+    Decorator that explicitly classifies a route as a read-only path so that it
+    can be called by read-only scoped API tokens even when it uses a non-safe
+    HTTP method (for example an export endpoint triggered by POST).
+
+    Endpoints without this marker are handled conservatively: read-only
+    tokens may only use safe HTTP methods (GET, HEAD, OPTIONS).
+
+    :param f: A view function or flask-restx Resource class that performs no writes
+    :return: The same object marked as safe for read-only tokens
+    """
+    return read_only_token_allowed_wrapper(f)
 
 
 def get_plugin_names():

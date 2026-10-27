@@ -1043,6 +1043,13 @@ class Configs(db.Model):
         super(Configs, self).__init__(**kwargs)
 
 
+# Token scopes. A full scope token has the same access as the user that owns
+# it while a read-only token can only issue safe (read) requests.
+TOKEN_SCOPE_FULL = "full"
+TOKEN_SCOPE_READ_ONLY = "read_only"
+TOKEN_SCOPES = (TOKEN_SCOPE_FULL, TOKEN_SCOPE_READ_ONLY)
+
+
 class Tokens(db.Model):
     __tablename__ = "tokens"
     id = db.Column(db.Integer, primary_key=True)
@@ -1054,6 +1061,15 @@ class Tokens(db.Model):
         default=lambda: datetime.datetime.utcnow() + datetime.timedelta(days=30),
     )
     description = db.Column(db.Text)
+    # Tokens created before scopes existed have the column backfilled to "full"
+    # by migration. The server_default additionally treats any missing scope as
+    # full scope so that legacy tokens keep their previous behavior.
+    scope = db.Column(
+        db.String(32),
+        nullable=False,
+        default=TOKEN_SCOPE_FULL,
+        server_default=TOKEN_SCOPE_FULL,
+    )
     value = db.Column(db.String(128), unique=True)
 
     user = db.relationship("Users", foreign_keys="Tokens.user_id", lazy="select")

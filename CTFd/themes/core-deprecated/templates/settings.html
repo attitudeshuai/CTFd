@@ -85,6 +85,13 @@
 							<b>{{ form.description.label }}</b>
 							{{ form.description(class="form-control", rows="3") }}
 						</div>
+						<div class="form-group">
+							<b>{{ form.scope.label }}</b>
+							{{ form.scope(class="form-control custom-select") }}
+							<small class="form-text text-muted">
+								Read-only tokens can call query endpoints but cannot perform any write operations. The scope cannot be changed after creation; revoke and recreate the token to change it.
+							</small>
+						</div>
 						<div class="form-group text-right">
 							{{ form.submit(class="btn btn-md btn-primary btn-outlined") }}
 						</div>
@@ -100,6 +107,7 @@
 								<td class="text-center"><b>Created</b></td>
 								<td class="text-center"><b>Expiration</b></td>
 								<td class="text-center"><b>Description</b></td>
+								<td class="text-center"><b>Scope</b></td>
 								<td class="text-center"><b>Delete</b></td>
 							</tr>
 						</thead>
@@ -109,6 +117,13 @@
 								<td><span data-time="{{ token.created | isoformat }}"></span></td>
 								<td><span data-time="{{ token.expiration | isoformat }}"></span></td>
 								<td><span>{{ token.description | default('', true) }}</span></td>
+								<td>
+									{% if token.scope == "read_only" %}
+									<span class="badge badge-secondary">Read-only</span>
+									{% else %}
+									<span class="badge badge-primary">Full</span>
+									{% endif %}
+								</td>
 								<td class="text-center">
 									<span class="delete-token" role="button" data-token-id="{{ token.id }}">
 										<i class="btn-fa fas fa-times"></i>

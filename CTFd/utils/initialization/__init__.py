@@ -33,7 +33,12 @@ from CTFd.utils.plugins import (
     get_registered_scripts,
     get_registered_stylesheets,
 )
-from CTFd.utils.security.auth import login_user, logout_user, lookup_user_token
+from CTFd.utils.security.auth import (
+    login_user,
+    logout_user,
+    lookup_user_token_with_scope,
+    token_scope_allows_request,
+)
 from CTFd.utils.security.csrf import generate_nonce
 from CTFd.utils.security.email import (
     generate_password_reset_token,
@@ -368,7 +373,7 @@ def init_request_processors(app):
         ):
             try:
                 token_type, token = token.split(" ", 1)
-                user = lookup_user_token(token)
+                user, scope = lookup_user_token_with_scope(token)
             except UserNotFoundException:
                 abort(401, description="Your access token is invalid")
             except UserTokenExpiredException:
@@ -380,6 +385,21 @@ def init_request_processors(app):
                     abort(403, description="You have been banned from this CTF")
                 if user.team and user.team.banned:
                     abort(403, description="Your team has been banned from this CTF")
+                # Read-only token scopes are enforced here, in the unified auth
+                # layer, so that every endpoint (including plugin endpoints) is
+                # covered without per-endpoint checks. The user session is only
+                # established after the scope check passes, guaranteeing that a
+                # rejected write never reaches or modifies anything.
+                view_func = app.view_functions.get(request.endpoint)
+                if not token_scope_allows_request(scope, request.method, view_func):
+                    abort(
+                        403,
+                        description=(
+                            "Your access token is restricted to the read-only "
+                            "scope and cannot perform %s requests. Use a token "
+                            "with the full scope for write operations." % request.method
+                        ),
+                    )
                 login_user(user)
 
     @app.before_request

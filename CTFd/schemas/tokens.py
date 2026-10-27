@@ -6,7 +6,7 @@ class TokenSchema(ma.ModelSchema):
     class Meta:
         model = Tokens
         include_fk = True
-        dump_only = ("id", "expiration", "type")
+        dump_only = ("id", "expiration", "type", "scope")
 
     views = {
         "admin": [
@@ -16,9 +16,17 @@ class TokenSchema(ma.ModelSchema):
             "created",
             "expiration",
             "description",
+            "scope",
             "value",
         ],
-        "user": ["id", "type", "created", "expiration", "description"],
+        "user": [
+            "id",
+            "type",
+            "created",
+            "expiration",
+            "description",
+            "scope",
+        ],
     }
 
     def __init__(self, view=None, *args, **kwargs):

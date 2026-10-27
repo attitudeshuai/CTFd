@@ -5,13 +5,16 @@ from flask_restx import Namespace, Resource
 
 from CTFd.utils.config import ctf_name
 from CTFd.utils.csv import dump_csv
-from CTFd.utils.decorators import admins_only, ratelimit
+from CTFd.utils.decorators import admins_only, ratelimit, read_only_token_allowed
 from CTFd.utils.exports import export_ctf as export_ctf_util
 
 exports_namespace = Namespace("exports", description="Endpoint to retrieve Exports")
 
 
+# CSV/CTF exports are triggered via POST but only return data and never modify
+# it, so they are explicitly classified as read paths for read-only tokens.
 @exports_namespace.route("/raw")
+@read_only_token_allowed
 class ExportList(Resource):
     @admins_only
     @ratelimit(method="POST", limit=10, interval=60)

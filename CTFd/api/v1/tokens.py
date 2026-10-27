@@ -6,7 +6,7 @@ from flask_restx import Namespace, Resource
 
 from CTFd.api.v1.helpers.schemas import sqlalchemy_to_pydantic
 from CTFd.api.v1.schemas import APIDetailedSuccessResponse, APIListSuccessResponse
-from CTFd.models import Tokens, db
+from CTFd.models import TOKEN_SCOPE_FULL, TOKEN_SCOPES, Tokens, db
 from CTFd.schemas.tokens import TokenSchema
 from CTFd.utils.decorators import authed_only, require_verified_emails
 from CTFd.utils.security.auth import generate_user_token
@@ -61,9 +61,9 @@ class TokenList(Resource):
     def get(self):
         user = get_current_user()
         tokens = Tokens.query.filter_by(user_id=user.id)
-        response = TokenSchema(view=["id", "type", "expiration"], many=True).dump(
-            tokens
-        )
+        response = TokenSchema(
+            view=["id", "type", "scope", "expiration"], many=True
+        ).dump(tokens)
 
         if response.errors:
             return {"success": False, "errors": response.errors}, 400
@@ -86,12 +86,28 @@ class TokenList(Resource):
         req = request.get_json()
         expiration = req.get("expiration")
         description = req.get("description")
+        # Scope is chosen at creation time and cannot be changed afterwards;
+        # a token must be revoked and recreated to change its scope. It
+        # defaults to full scope so that requests which omit it behave exactly
+        # like tokens created before scopes existed.
+        scope = req.get("scope", TOKEN_SCOPE_FULL)
+        if scope not in TOKEN_SCOPES:
+            return (
+                {
+                    "success": False,
+                    "errors": {"scope": "Invalid token scope"},
+                },
+                400,
+            )
         if expiration:
             expiration = datetime.datetime.strptime(expiration, "%Y-%m-%d")
 
         user = get_current_user()
         token = generate_user_token(
-            user, expiration=expiration, description=description
+            user,
+            expiration=expiration,
+            description=description,
+            scope=scope,
         )
 
         # Explicitly use admin view so that user's can see the value of their token

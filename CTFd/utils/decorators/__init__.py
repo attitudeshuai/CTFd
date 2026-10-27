@@ -142,6 +142,24 @@ def admins_only(f):
     return admins_only_wrapper
 
 
+def read_only_token_allowed(f):
+    """
+    Decorator that explicitly classifies an endpoint as a read-only path so
+    that read-only scoped API tokens may call it even when it uses a non-safe
+    HTTP method (e.g. CSV/backup export endpoints that only return data).
+
+    It can be applied to a regular Flask view function or to a flask-restx
+    Resource class. Endpoints without this marker are treated conservatively:
+    non-safe methods are always denied to read-only tokens.
+    :param f: A view function or Resource class that performs no writes
+    :return: The same object with the read-safe marker attribute set
+    """
+    from CTFd.utils.security.auth import READ_SAFE_ENDPOINT_ATTR
+
+    setattr(f, READ_SAFE_ENDPOINT_ATTR, True)
+    return f
+
+
 def require_team(f):
     @functools.wraps(f)
     def require_team_wrapper(*args, **kwargs):
