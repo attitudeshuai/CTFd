@@ -47,6 +47,10 @@ from CTFd.utils.health import check_config, check_database
 from CTFd.utils.helpers import get_errors, get_infos, markup
 from CTFd.utils.modes import USERS_MODE
 from CTFd.utils.modules import can_access_challenge
+from CTFd.utils.notifications import (
+    get_read_notification_ids,
+    purge_expired_notifications,
+)
 from CTFd.utils.security.auth import login_user
 from CTFd.utils.security.csrf import generate_nonce
 from CTFd.utils.security.signing import (
@@ -299,8 +303,17 @@ def integrations():
 
 @views.route("/notifications", methods=["GET"])
 def notifications():
+    purge_expired_notifications()
     notifications = Notifications.query.order_by(Notifications.id.desc()).all()
-    return render_template("notifications.html", notifications=notifications)
+
+    read_ids = get_read_notification_ids(session.get("id")) if authed() else set()
+    unread_notifications = [n for n in notifications if n.id not in read_ids]
+    read_notifications = [n for n in notifications if n.id in read_ids]
+    return render_template(
+        "notifications.html",
+        unread_notifications=unread_notifications,
+        read_notifications=read_notifications,
+    )
 
 
 @views.route("/settings", methods=["GET"])

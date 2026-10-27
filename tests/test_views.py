@@ -15,6 +15,7 @@ from tests.helpers import (
     destroy_ctfd,
     gen_challenge,
     gen_file,
+    gen_notification,
     gen_page,
     login_as_user,
     register_user,
@@ -549,4 +550,43 @@ def test_robots_txt():
             r = client.get("/robots.txt")
             assert r.status_code == 200
             assert r.get_data(as_text=True) == "testing"
+    destroy_ctfd(app)
+
+
+def test_notifications_page_buckets_by_read_state():
+    """The notifications page renders unread and read notifications in
+    separate groups for the current user"""
+    app = create_ctfd()
+    with app.app_context():
+        register_user(app)
+        gen_notification(app.db, title="Alpha", content="u")
+        gen_notification(app.db, title="Beta", content="r")
+
+        with login_as_user(app) as client:
+            client.post("/api/v1/notifications/2/read", json={})
+            page = client.get("/notifications").get_data(as_text=True)
+            unread_part = page.split('id="notifications-unread"')[1].split(
+                'id="notifications-read"'
+            )[0]
+            read_part = page.split('id="notifications-read"')[1]
+            assert "Alpha" in unread_part
+            assert "Beta" not in unread_part
+            assert "Beta" in read_part
+            assert "Alpha" not in read_part
+            assert "mark-notification-read" in unread_part
+            assert "mark-notification-read" not in read_part
+            assert 'id="mark-all-notifications"' in page
+    destroy_ctfd(app)
+
+
+def test_notifications_page_anonymous_has_no_mark_controls():
+    """Anonymous visitors see notifications but cannot mark them read"""
+    app = create_ctfd()
+    with app.app_context():
+        gen_notification(app.db, title="anon-notif", content="x")
+        with app.test_client() as client:
+            page = client.get("/notifications").get_data(as_text=True)
+            assert "anon-notif" in page
+            assert "mark-notification-read" not in page
+            assert 'id="mark-all-notifications"' not in page
     destroy_ctfd(app)

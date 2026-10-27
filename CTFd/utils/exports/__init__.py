@@ -279,6 +279,7 @@ def import_ctf(backup, erase=True, ignore_overrides=False):
         "db/solves.json",
         "db/files.json",
         "db/notifications.json",
+        "db/notification_reads.json",
         "db/pages.json",
         "db/tracking.json",
         "db/config.json",

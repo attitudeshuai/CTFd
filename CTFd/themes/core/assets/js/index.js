@@ -14,10 +14,16 @@ import collapse from "./utils/collapse";
 import eventAlerts from "./utils/notifications/alerts";
 import eventToasts from "./utils/notifications/toasts";
 import eventRead from "./utils/notifications/read";
+import patchNotificationEvents from "./utils/notifications/events";
 
 import "./components/language";
 
 dayjs.extend(advancedFormat);
+
+// Route notification read state through server-side per-user associations
+// instead of the vendored localStorage counters. Must run before CTFd.init
+// so that events.init/events.connect are replaced prior to SSE setup.
+patchNotificationEvents();
 CTFd.init(window.init);
 
 (() => {

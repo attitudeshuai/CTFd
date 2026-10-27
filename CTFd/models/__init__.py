@@ -63,6 +63,14 @@ class Notifications(db.Model):
 
     user = db.relationship("Users", foreign_keys="Notifications.user_id", lazy="select")
     team = db.relationship("Teams", foreign_keys="Notifications.team_id", lazy="select")
+    reads = db.relationship(
+        "NotificationRead",
+        foreign_keys="NotificationRead.notification_id",
+        lazy="select",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="notification",
+    )
 
     @property
     def html(self):
@@ -73,6 +81,38 @@ class Notifications(db.Model):
 
     def __init__(self, *args, **kwargs):
         super(Notifications, self).__init__(**kwargs)
+
+
+class NotificationRead(db.Model):
+    __tablename__ = "notification_reads"
+    id = db.Column(db.Integer, primary_key=True)
+    notification_id = db.Column(
+        db.Integer,
+        db.ForeignKey("notifications.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    notification = db.relationship(
+        "Notifications",
+        foreign_keys=[notification_id],
+        lazy="select",
+        back_populates="reads",
+    )
+    user = db.relationship("Users", foreign_keys=[user_id], lazy="select")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "notification_id", "user_id", name="uq_notification_read_user"
+        ),
+    )
 
 
 class Pages(db.Model):

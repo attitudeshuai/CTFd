@@ -9,6 +9,26 @@
 	<div class="container">
 		<div class="row">
 			<div class="col-md-12">
+				<form id="notification-retention-form" class="mb-4">
+					<div class="form-group mb-2">
+						<b>{% trans %}Notification Retention Period{% endtrans %}</b>
+					</div>
+					<div class="form-row align-items-center">
+						<div class="col-auto">
+							<input type="number" min="1" class="form-control" name="notification_retention_days" id="notification_retention_days" value="{{ retention_days }}" placeholder="{% trans %}Keep forever{% endtrans %}">
+						</div>
+						<div class="col-auto">
+							{% trans %}days{% endtrans %}
+						</div>
+						<div class="col-auto">
+							<button type="submit" class="btn btn-primary" id="retention-form-save">{% trans %}Save{% endtrans %}</button>
+						</div>
+					</div>
+					<small class="form-text text-muted">
+						{% trans %}Notifications older than this period are automatically deleted along with their read history. Leave empty to keep notifications forever.{% endtrans %}
+					</small>
+				</form>
+				<hr>
 				{% with form = Forms.notifications.NotificationForm() %}
 				<form method="POST" id="notifications_form" autocomplete="off">
 					<div class="form-group">
@@ -78,6 +98,11 @@
 								<p>{{ notification.html }}</p>
 								<small class="text-muted"><span data-time="{{ notification.date | isoformat }}"></span></small>
 							</blockquote>
+							{% set read_count = read_counts.get(notification.id, 0) %}
+							<small class="text-muted">
+								<i class="fas fa-check-double"></i>
+								{% trans num=read_count %}{{ num }} user has read this notification{% pluralize %}{{ num }} users have read this notification{% endtrans %}
+							</small>
 						</div>
 					</div>
 				{% endfor %}

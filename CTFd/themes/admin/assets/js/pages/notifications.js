@@ -41,9 +41,69 @@ function submit(event) {
         content: response.data.content,
         html: response.data.html,
         date: response.data.date,
+        readCount: 0,
       },
     }).$mount(vueContainer);
   });
+}
+
+const RETENTION_CONFIG_KEY = "notification_retention_days";
+
+function saveRetention(event) {
+  event.preventDefault();
+  const $form = $(this);
+  const value = $form.find(":input[name=notification_retention_days]").val();
+  const $button = $form.find("#retention-form-save");
+  $button.attr("disabled", true);
+
+  const done = () => {
+    setTimeout(function () {
+      $button.attr("disabled", false);
+    }, 1000);
+  };
+
+  if (value === "") {
+    CTFd.api
+      .delete_config({ configKey: RETENTION_CONFIG_KEY })
+      .then((response) => {
+        // A 404 (config key was never set) resolves to a body without
+        // success; either way retention is now unset which is the goal.
+        ezAlert({
+          title: "Saved",
+          body: "Notifications will be kept forever.",
+          button: "OK",
+        });
+      })
+      .catch(() => {
+        ezAlert({
+          title: "Error",
+          body: "Could not update the retention period. Please try again.",
+          button: "OK",
+        });
+      })
+      .finally(done);
+  } else {
+    const params = {};
+    params[RETENTION_CONFIG_KEY] = parseInt(value, 10);
+    CTFd.api
+      .patch_config_list({}, params)
+      .then((response) => {
+        if (response.success) {
+          ezAlert({
+            title: "Saved",
+            body: "The notification retention period has been updated.",
+            button: "OK",
+          });
+        } else {
+          ezAlert({
+            title: "Error",
+            body: "Could not save the retention period. Please try again.",
+            button: "OK",
+          });
+        }
+      })
+      .finally(done);
+  }
 }
 
 function deleteNotification(event) {
@@ -63,4 +123,5 @@ function deleteNotification(event) {
 $(() => {
   $("#notifications_form").submit(submit);
   $(".delete-notification").click(deleteNotification);
+  $("#notification-retention-form").submit(saveRetention);
 });

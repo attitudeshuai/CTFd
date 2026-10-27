@@ -13,6 +13,11 @@ class NotificationSchema(ma.ModelSchema):
     # Used to force the schema to include the html property from the model
     html = fields.Str()
 
+    # Per-user read state. Computed by the API endpoints for the current
+    # user; always false for anonymous requests. Dump-only so that it can
+    # never be set through the admin create endpoint.
+    read = fields.Bool(dump_only=True, dump_default=False)
+
     def __init__(self, view=None, *args, **kwargs):
         if view:
             if isinstance(view, string_types):

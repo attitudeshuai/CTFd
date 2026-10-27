@@ -42,6 +42,7 @@ from CTFd.models import (
     Awards,
     Challenges,
     Configs,
+    NotificationRead,
     Notifications,
     Pages,
     Solves,
@@ -236,6 +237,7 @@ def reset():
             Pages.query.delete()
 
         if data.get("notifications"):
+            NotificationRead.query.delete()
             Notifications.query.delete()
 
         if data.get("challenges"):
@@ -246,6 +248,7 @@ def reset():
             Challenges.query.delete()
 
         if data.get("accounts"):
+            NotificationRead.query.delete()
             Users.query.delete()
             Teams.query.delete()
             require_setup = True

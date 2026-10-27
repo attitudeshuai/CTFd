@@ -1,4 +1,4 @@
-from flask import Blueprint, Response, current_app, stream_with_context
+from flask import Blueprint, Response, current_app, session, stream_with_context
 
 from CTFd.models import db
 from CTFd.utils import get_app_config
@@ -13,7 +13,7 @@ events = Blueprint("events", __name__)
 def subscribe():
     @stream_with_context
     def gen():
-        for event in current_app.events_manager.subscribe():
+        for event in current_app.events_manager.subscribe(user_id=session.get("id")):
             yield str(event)
 
     enabled = get_app_config("SERVER_SENT_EVENTS")

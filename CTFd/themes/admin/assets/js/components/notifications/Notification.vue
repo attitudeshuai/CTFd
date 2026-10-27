@@ -19,6 +19,10 @@
           <span :data-time="this.date">{{ this.localDate() }}</span>
         </small>
       </blockquote>
+      <small class="text-muted">
+        <i class="fas fa-check-double"></i>
+        {{ this.readCountLabel }}
+      </small>
     </div>
   </div>
 </template>
@@ -34,6 +38,18 @@ export default {
     content: String,
     html: String,
     date: String,
+    readCount: {
+      type: Number,
+      default: 0,
+    },
+  },
+  computed: {
+    readCountLabel: function () {
+      if (this.readCount === 1) {
+        return "1 user has read this notification";
+      }
+      return `${this.readCount} users have read this notification`;
+    },
   },
   methods: {
     localDate: function () {

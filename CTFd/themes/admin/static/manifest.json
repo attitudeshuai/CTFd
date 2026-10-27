@@ -1,15 +1,15 @@
 {
   "_CommentBox-!~{00p}~.js": {
-    "file": "assets/CommentBox-CZ8OEr5k.css",
+    "file": "assets/CommentBox-eCEym-Uz.css",
     "src": "_CommentBox-!~{00p}~.js"
   },
-  "_CommentBox-B8-KVpG1.js": {
-    "file": "assets/CommentBox-B8-KVpG1.js",
+  "_CommentBox-Dq76IJnh.js": {
+    "file": "assets/CommentBox-Dq76IJnh.js",
     "imports": [
       "assets/js/pages/main.js"
     ],
     "css": [
-      "assets/CommentBox-CZ8OEr5k.css"
+      "assets/CommentBox-eCEym-Uz.css"
     ]
   },
   "_echarts-l0sNRNKZ.js": {
@@ -74,16 +74,16 @@
     ]
   },
   "assets/js/pages/challenge.js": {
-    "file": "assets/pages/challenge-DBqX7EX9.js",
+    "file": "assets/pages/challenge-CFI1YA7F.js",
     "src": "assets/js/pages/challenge.js",
     "isEntry": true,
     "imports": [
       "assets/js/pages/main.js",
       "_tab-B9ro04fl.js",
-      "_CommentBox-B8-KVpG1.js"
+      "_CommentBox-Dq76IJnh.js"
     ],
     "css": [
-      "assets/challenge-Drt7zm1v.css"
+      "assets/challenge-CXR6NgwX.css"
     ]
   },
   "assets/js/pages/challenges.js": {
@@ -105,13 +105,13 @@
     ]
   },
   "assets/js/pages/editor.js": {
-    "file": "assets/pages/editor-CIgXBv0i.js",
+    "file": "assets/pages/editor-QG2py0Da.js",
     "src": "assets/js/pages/editor.js",
     "isEntry": true,
     "imports": [
       "assets/js/pages/main.js",
       "_htmlmixed-DvXcbxOJ.js",
-      "_CommentBox-B8-KVpG1.js"
+      "_CommentBox-Dq76IJnh.js"
     ]
   },
   "assets/js/pages/main.js": {
@@ -128,7 +128,7 @@
     ]
   },
   "assets/js/pages/notifications.js": {
-    "file": "assets/pages/notifications-DgmSvkF7.js",
+    "file": "assets/pages/notifications-D-XZfOdv.js",
     "src": "assets/js/pages/notifications.js",
     "isEntry": true,
     "imports": [
@@ -177,13 +177,13 @@
     ]
   },
   "assets/js/pages/team.js": {
-    "file": "assets/pages/team-BrcrH16J.js",
+    "file": "assets/pages/team-BAoDTxaO.js",
     "src": "assets/js/pages/team.js",
     "isEntry": true,
     "imports": [
       "assets/js/pages/main.js",
       "_graphs-QEclu5bP.js",
-      "_CommentBox-B8-KVpG1.js",
+      "_CommentBox-Dq76IJnh.js",
       "_echarts.common-DM-1jJD7.js"
     ]
   },
@@ -196,13 +196,13 @@
     ]
   },
   "assets/js/pages/user.js": {
-    "file": "assets/pages/user-DRv1yWcM.js",
+    "file": "assets/pages/user-BYliCrl4.js",
     "src": "assets/js/pages/user.js",
     "isEntry": true,
     "imports": [
       "assets/js/pages/main.js",
       "_graphs-QEclu5bP.js",
-      "_CommentBox-B8-KVpG1.js",
+      "_CommentBox-Dq76IJnh.js",
       "_echarts.common-DM-1jJD7.js"
     ]
   },

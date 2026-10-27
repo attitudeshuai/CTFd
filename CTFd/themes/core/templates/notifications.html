@@ -1,5 +1,22 @@
 {% extends "base.html" %}
 
+{% macro notification_card(notification, unread) %}
+<div class="card bg-body-tertiary mb-4 notification-card" data-notif-id="{{ notification.id }}">
+	<div class="card-body">
+		<h3 class="card-title">{{ notification.title }}</h3>
+		<blockquote class="blockquote mb-0">
+			<p>{{ notification.html }}</p>
+			<small class="text-muted"><span data-time="{{ notification.date | isoformat }}"></span></small>
+		</blockquote>
+		{% if authed() and unread %}
+		<button type="button" class="btn btn-sm btn-primary mt-2 mark-notification-read" data-notif-id="{{ notification.id }}">
+			{% trans %}Mark as read{% endtrans %}
+		</button>
+		{% endif %}
+	</div>
+</div>
+{% endmacro %}
+
 {% block content %}
 	<div class="jumbotron">
 		<div class="container">
@@ -9,26 +26,39 @@
 		</div>
 	</div>
 	<div class="container">
-		{% if not notifications %}
+		{% if not unread_notifications and not read_notifications %}
 		<h2 class="text-center">
 			{% trans %}There are no notifications yet{% endtrans %}
 		</h2>
 		{% endif %}
-		{% for notification in notifications %}
-		<div class="card bg-body-tertiary mb-4">
-			<div class="card-body">
-				<h3 class="card-title">{{ notification.title }}</h3>
-				<blockquote class="blockquote mb-0">
-					<p>{{ notification.html }}</p>
-					<small class="text-muted"><span data-time="{{ notification.date | isoformat }}"></span></small>
-				</blockquote>
+
+		<div id="unread-section" {% if not unread_notifications %}class="d-none"{% endif %}>
+			<div class="d-flex justify-content-between align-items-center mb-3">
+				<h2 class="h4 mb-0">{% trans %}Unread{% endtrans %}</h2>
+				{% if authed() %}
+				<button type="button" class="btn btn-sm btn-outline-primary" id="mark-all-notifications">
+					{% trans %}Mark all as read{% endtrans %}
+				</button>
+				{% endif %}
+			</div>
+			<div id="notifications-unread">
+				{% for notification in unread_notifications %}
+					{{ notification_card(notification, True) }}
+				{% endfor %}
 			</div>
 		</div>
-		{% endfor %}
+
+		<div id="read-section" {% if not read_notifications %}class="d-none"{% endif %}>
+			<h2 class="h4 mb-3">{% trans %}Read{% endtrans %}</h2>
+			<div id="notifications-read">
+				{% for notification in read_notifications %}
+					{{ notification_card(notification, False) }}
+				{% endfor %}
+			</div>
+		</div>
 	</div>
 {% endblock %}
 
 {% block scripts %}
   {{ Assets.js("assets/js/notifications.js") }}
 {% endblock %}
-

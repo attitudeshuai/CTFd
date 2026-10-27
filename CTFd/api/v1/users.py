@@ -13,6 +13,7 @@ from CTFd.cache import clear_challenges, clear_standings, clear_user_session
 from CTFd.constants import RawEnum
 from CTFd.models import (
     Awards,
+    NotificationRead,
     Notifications,
     Solves,
     Submissions,
@@ -276,6 +277,9 @@ class UserPublic(Resource):
                 400,
             )
 
+        # Remove this user's read associations (including reads of broadcast
+        # notifications that are not themselves deleted here)
+        NotificationRead.query.filter_by(user_id=user_id).delete()
         Notifications.query.filter_by(user_id=user_id).delete()
         Awards.query.filter_by(user_id=user_id).delete()
         Unlocks.query.filter_by(user_id=user_id).delete()
